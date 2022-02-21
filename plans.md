@@ -8,3 +8,7 @@ For tweet grabbing:
 
 Do we want a stream or our own stream? How good is the twitter stream?
 Can we attribute tweets to an account from stream?
+
+ADD TESTS
+
+ADD MULTITHREADING

@@ -28,7 +28,7 @@ def bearer_oauth(r):
     r.headers["User-Agent"] = "v2UserLookupPython"
     return r
 
-def connect_to_endpoint(url,params=None):
+def connect_to_endpoint(url:str,params=None) -> json:
     """
     Connnects to the Twitter API using the given url and params
 
@@ -45,7 +45,7 @@ def connect_to_endpoint(url,params=None):
         )
     return response.json()
 
-def get_user_id(user):
+def get_user_id(user:str) -> dict:
     """
     Given a twitter username without "@", returns the user id
 
@@ -73,7 +73,7 @@ def get_user_id(user):
     }
     return info
 
-def get_user_timeline(user_id): # ! is this variable in size?
+def get_user_timeline(user_id:str) -> dict: # ! is this variable in size?
     """
     Given a user id, return some tweets from the users timeline
 
@@ -92,7 +92,10 @@ def get_user_timeline(user_id): # ! is this variable in size?
     }
     return info
 
-def get_stream_rules(): # ! finish documentation
+def get_stream_rules():
+    """
+    Gets the current deployed rules on the stream associated with the current BEARER_TOKEN
+    """
     response = requests.get(
         "https://api.twitter.com/2/tweets/search/stream/rules", auth=bearer_oauth
     )
@@ -114,7 +117,10 @@ def get_stream_rules(): # ! finish documentation
         return None, response.json()
 
 
-def delete_all_stream_rules(rules_response):
+def delete_all_stream_rules(rules_response:json) -> None:
+    """
+    Deletes all the rules on the stream associated with the current BEARER_TOKEN
+    """
     if rules_response is None or "data" not in rules_response:
         return None
 
@@ -134,7 +140,13 @@ def delete_all_stream_rules(rules_response):
 
     logging.debug(f"Rule Deletion Response: {json.dumps(response.json())}")
 
-def delete_stream_rules(ids):
+def delete_stream_rules(ids:list) -> None:
+    """
+    Deletes specific rules on the stream associated with the current BEARER_TOKEN
+
+    Arguments:
+        ids (list):
+    """
     payload = {"delete": {"ids": ids}}
     response = requests.post(
         "https://api.twitter.com/2/tweets/search/stream/rules",
@@ -150,7 +162,10 @@ def delete_stream_rules(ids):
 
     logging.debug(f"Rule Deletion Response: {json.dumps(response.json())}")
 
-def set_stream_rules(rules):
+def set_stream_rules(rules: list[dict]) -> dict or None:
+    """
+    Adds given rules to the stream associated with the current BEARER_TOKEN 
+    """
     payload = {"add":rules}
     response = requests.post(
         "https://api.twitter.com/2/tweets/search/stream/rules",
@@ -183,6 +198,9 @@ def set_stream_rules(rules):
         return info
 
 def connect_to_stream():
+    """
+    Connects to the stream associated with the current BEARER_TOKEN
+    """
     response = requests.get(
         "https://api.twitter.com/2/tweets/search/stream", auth=bearer_oauth, stream=True,
     )
@@ -201,16 +219,14 @@ def connect_to_stream():
                 f.write(json_response["data"]["text"])
 
 if __name__ == '__main__':
-    # sami_id = get_user_id("Sami_Amer_PS")["id"]
-    # sami_tweets = get_user_timeline(sami_id)
-    # connect_to_stream()
 
-    rules = [
-        {"value": "from:2899773086"},
-        {"value": "from:Wario64"},
-        {"value": "from:763099930487615488 "}]
+    # rules = [
+    #     {"value": "from:2899773086"},
+    #     {"value": "from:Wario64"},
+    #     {"value": "from:763099930487615488 "}]
     
     # rules, response = get_stream_rules()
     # delete_all_stream_rules(response)
     
     # set_stream_rules(rules)
+    pass
