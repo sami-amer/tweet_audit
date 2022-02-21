@@ -7,6 +7,7 @@ import requests
 import os
 import json
 import logging
+import pandas as pd
 
 ## Logging Setup
 logging.basicConfig(filename='AUDIT_LOG.log', level=logging.DEBUG, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -122,6 +123,7 @@ class TwitterStream:
             "rules": data,
             "rule_count":meta["result_count"]
         }
+            logging.info(info)
             return info, response.json()
         except KeyError:
             logging.warning("No Rules Found!")
@@ -177,6 +179,7 @@ class TwitterStream:
         Adds given rules to the stream associated with the current BEARER_TOKEN 
         """
         payload = {"add":rules}
+        print(payload)
         response = requests.post(
             "https://api.twitter.com/2/tweets/search/stream/rules",
             auth=self.bearer_oauth,
@@ -228,8 +231,38 @@ class TwitterStream:
                     print(json.dumps(json_response, indent=4, sort_keys=True))
                     f.write(json_response["data"]["text"])
 
+    def add_users(self,user_ids:list[tuple]) -> None:
+        rules = []
+        for id,tag in user_ids:
+            rules.append({"value": f"from:{id}", "tag": f"{tag}"})
+        
+        for rule in rules:
+            logging.info(f"Adding Rule: {rule}")
+        self.set_rules(rules)
+
+    # ! MOVE THIS SOMEWHERE ELSE, IMPLEMENT IT TO ADD_Users
+    def format_rules(self,usernames): # ! Use Usernames over User IDs because they are capped at 15
+        rules = []
+        for i in range(0,len(usernames),22): # ! if this can find average, can be more efficient
+            # ! Add check for abnormal lengths
+            rule = ''
+            for user in usernames[i:i+22]:
+                rule+=f"from:{user} OR "
+            rules.append(rule[:-4:])
+        return rules
+
 if __name__ == '__main__':
     stream = TwitterStream()
-    id = stream.get_user_id("h_jackson_")['id']
-    tweets = stream.get_user_timeline(id)
-    print(tweets)
+    # ids = [stream.get_user_id("Sami_Amer_PS")["id"], stream.get_user_id("h_jackson_")["id"]]
+
+    # df = pd.read_csv("_data/senate_usernames_dec21.csv")
+    # usernames = list(df["username"])
+    # # print(usernames)
+    # # stream.add_users(usernames)
+    # a = stream.format_rules(usernames)
+    # # _,response = stream.get_rules()
+    # # stream.delete_all_rules(response)
+    # for rule in a:
+    #     # print({"value":rule})
+    #     stream.set_rules([{"value":rule}])
+    stream.connect()

@@ -20,3 +20,4 @@ ADD MULTITHREADING
 CONSIDER MAKING CLASS/OOP?
     would allow us to keep track of rules and such offline, and reduce API calls
     Would also allow us to keep track of our own things more easily
+from:XXXXXXXXXXXXXXX OR
