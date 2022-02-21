@@ -1,5 +1,5 @@
 import pytest
-import auditor
+from auditor import TwitterStream
 
 ## ADD TESTS HERE
 

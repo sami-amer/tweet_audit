@@ -9,6 +9,14 @@ For tweet grabbing:
 Do we want a stream or our own stream? How good is the twitter stream?
 Can we attribute tweets to an account from stream?
 
+ADD Ability to add rules on the fly
+FIX what we do to data from stream
+TEST with data bunch of users
+
 ADD TESTS
 
 ADD MULTITHREADING
+
+CONSIDER MAKING CLASS/OOP?
+    would allow us to keep track of rules and such offline, and reduce API calls
+    Would also allow us to keep track of our own things more easily
