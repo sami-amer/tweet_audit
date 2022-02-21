@@ -1,5 +1,7 @@
 """
 Full pipeline control for tweet audit
+Adapted from the official TwitterAPIv2 Sample Code
+https://github.com/twitterdev/Twitter-API-v2-sample-code/blob/main/
 """ 
 import requests
 import os
