@@ -81,7 +81,7 @@ class TwitterStream:
         }
         return info
 
-    def get_user_timeline(self,user_id:str,max_results=5) -> list[dict]: # ! is this variable in size?
+    def get_user_timeline(self,user_id:str,max_results=5) -> list[dict]:
         """
         Given a user id, return some tweets from the users timeline
 
