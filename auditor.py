@@ -23,7 +23,7 @@ class TwitterStream:
     Python Object to control TwitterAPIv2 stream
     """
 
-    def __init__(self):
+    def __init__(self): # ? Should this init with the bearer token?
         # To set your enviornment variables in your terminal run the following line:
         # export 'BEARER_TOKEN'='<your_bearer_token>'
         self.bearer_token = os.environ.get("BEARER_TOKEN")
@@ -81,7 +81,7 @@ class TwitterStream:
         }
         return info
 
-    def get_user_timeline(self,user_id:str) -> dict: # ! is this variable in size?
+    def get_user_timeline(self,user_id:str,max_results=5) -> list[dict]: # ! is this variable in size?
         """
         Given a user id, return some tweets from the users timeline
 
@@ -89,18 +89,21 @@ class TwitterStream:
             user_id (str): the users id
         """
         url= "https://api.twitter.com/2/users/{}/tweets".format(user_id)
-        params = {"tweet.fields": "text,source,author_id,attachments"}
-        data = self.connect_to_endpoint(url, params)['data'][0] # ? Make this a default dict?
-        info = {
-            "id" : data["id"],
-            "text": data["text"],
-            "author_id": data["author_id"], # ! Add check for this
-            "source": data["source"],
-            #"attachments": data["attachments"] if data["attachments"] else None ! add check for this
-        }
-        return info
+        params = {"tweet.fields": "text,source,author_id,attachments","max_results":str(max_results)}
+        data = self.connect_to_endpoint(url, params)['data'] # ? Make this a default dict?
+        tweets = []
+        for tweet in data:
+            info = {
+                "id" : tweet["id"],
+                "text": tweet["text"],
+                "author_id": tweet["author_id"], # ! Add check for this
+                "source": tweet["source"],
+                #"attachments": tweet["attachments"] if tweet["attachments"] else None ! add check for this
+            }
+            tweets.append(info)
+        return tweets
 
-    def get_stream_rules(self):
+    def get_rules(self):
         """
         Gets the current deployed rules on the stream associated with the current BEARER_TOKEN
         """
@@ -124,7 +127,7 @@ class TwitterStream:
             logging.warning("No Rules Found!")
             return None, response.json()
     
-    def delete_all_stream_rules(self,rules_response:json) -> None:
+    def delete_all_rules(self,rules_response:json) -> None:
         """
         Deletes all the rules on the stream associated with the current BEARER_TOKEN
         """
@@ -147,7 +150,7 @@ class TwitterStream:
 
         logging.debug(f"Rule Deletion Response: {json.dumps(response.json())}")
 
-    def delete_stream_rules(self,ids:list) -> None:
+    def delete_rules(self,ids:list) -> None:
         """
         Deletes specific rules on the stream associated with the current BEARER_TOKEN
 
@@ -169,7 +172,7 @@ class TwitterStream:
 
         logging.debug(f"Rule Deletion Response: {json.dumps(response.json())}")
 
-    def set_stream_rules(self,rules: list[dict]) -> dict or None:
+    def set_rules(self,rules: list[dict]) -> dict or None:
         """
         Adds given rules to the stream associated with the current BEARER_TOKEN 
         """
@@ -204,7 +207,7 @@ class TwitterStream:
 
             return info
 
-    def connect_to_stream(self):
+    def connect(self):
         """
         Connects to the stream associated with the current BEARER_TOKEN
         """
@@ -226,4 +229,7 @@ class TwitterStream:
                     f.write(json_response["data"]["text"])
 
 if __name__ == '__main__':
-    pass
+    stream = TwitterStream()
+    id = stream.get_user_id("h_jackson_")['id']
+    tweets = stream.get_user_timeline(id)
+    print(tweets)
