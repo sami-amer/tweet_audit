@@ -224,12 +224,15 @@ class TwitterStream:
                     response.status_code, response.text
                 )
             )
-        with open("texts.txt","a+") as f: # ! make this stream into a python object as well
+        # ! is container the best way to do this?
+        with open("texts.txt","a") as f: # ! make this stream into a python object as well
             for response_line in response.iter_lines():
                 if response_line:
                     json_response = json.loads(response_line)
-                    print(json.dumps(json_response, indent=4, sort_keys=True))
+                    f.write(f"\nID FOR FOLLOWING TWEET: {json_response['data']['id']}\n")
                     f.write(json_response["data"]["text"])
+                    logging.info(json.dumps(json_response, indent=4, sort_keys=True))
+                    # f.write(json_response)
 
     def add_users(self,user_ids:list[tuple]) -> None:
         rules = []
@@ -266,3 +269,17 @@ if __name__ == '__main__':
     #     # print({"value":rule})
     #     stream.set_rules([{"value":rule}])
     stream.connect()
+    # stream.get_rules()
+    # TODO: create tools.py to import from
+    # TODO:     make the format_users a tool
+    # TODO:     Make a tool to take UCSD xlsx to a csv to use, and then to a list
+    # TODO: unit tests
+    # TODO: make it so rules can be updated by less than max length
+    # TODO:     set the "tag" to be rule length
+    # TODO:     Find shortest rule, add to it as much as possible
+    # TODO:     keep going until all people added
+    # TODO: make format_user account for avg length of list or other metric that can maximize rule size
+    # TODO: flush response faster to txt file
+    # TODO: get username from tweet id
+    # TODO: decide what kind of DB to store tweets in. list of JSONs?
+    # TODO: Match accounts to official congressional sites/accounts
