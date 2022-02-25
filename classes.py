@@ -111,27 +111,20 @@ class TwitterStream:
         Gets the current deployed rules on the stream associated with the current BEARER_TOKEN
         """
         url = "https://api.twitter.com/2/tweets/search/stream/rules"
-        # response = requests.get(
-        #     "https://api.twitter.com/2/tweets/search/stream/rules", auth=self.bearer_oauth
-        # )
-        # if response.status_code != 200:
-        #     raise Exception(
-        #         "Cannot get rules (HTTP {}): {}".format(response.status_code, response.text)
-        #     )
         response = self.get_from_endpoint(url)
-        logging.debug(f"Rule Get Response: {json.dumps(response.json())}")
+        logging.debug(f"Rule Get Response: {json.dumps(response)}")
         try:
-            data = response.json()["data"]
-            meta = response.json()["meta"]
+            data = response["data"]
+            meta = response["meta"]
             info = {
             "rules": data,
             "rule_count":meta["result_count"]
         }
             logging.info(info)
-            return info, response.json()
+            return info, response
         except KeyError:
             logging.warning("No Rules Found!")
-            return None, response.json()
+            return None, response
     
     def delete_all_rules(self,rules_response:json) -> None:
         """
@@ -143,20 +136,9 @@ class TwitterStream:
         ids = list(map(lambda rule: rule["id"], rules_response["data"]))
         payload = {"delete": {"ids": ids}}
         url = "https://api.twitter.com/2/tweets/search/stream/rules"
-        # response = requests.post(
-        #     "https://api.twitter.com/2/tweets/search/stream/rules",
-        #     auth=self.bearer_oauth,
-        #     json=payload
-        # )
-        # if response.status_code != 200:
-        #     raise Exception(
-        #         "Cannot delete rules (HTTP {}): {}".format(
-        #             response.status_code, response.text
-        #         )
-        #     )
         response = self.post_to_endpoint(url,payload)
 
-        logging.debug(f"Rule Deletion Response: {json.dumps(response.json())}")
+        logging.debug(f"Rule Deletion Response: {json.dumps(response)}")
 
     def delete_rules(self,ids:list) -> None:
         """
@@ -167,20 +149,9 @@ class TwitterStream:
         """
         payload = {"delete": {"ids": ids}}
         url = "https://api.twitter.com/2/tweets/search/stream/rules"
-        # response = requests.post(
-        #     "https://api.twitter.com/2/tweets/search/stream/rules",
-        #     auth=self.bearer_oauth,
-        #     json=payload
-        # )
-        # if response.status_code != 200:
-        #     raise Exception(
-        #         "Cannot delete rules (HTTP {}): {}".format(
-        #             response.status_code, response.text
-        #         )
-        #     )
 
         response = self.post_to_endpoint(url, payload) 
-        logging.debug(f"Rule Deletion Response: {json.dumps(response.json())}")
+        logging.debug(f"Rule Deletion Response: {json.dumps(response)}")
 
     def set_rules(self,rules: list[dict]) -> dict or None:
         """
@@ -188,24 +159,14 @@ class TwitterStream:
         """
         payload = {"add":rules}
         url = "https://api.twitter.com/2/tweets/search/stream/rules"
-        # print(payload)
-        # response = requests.post(
-        #     "https://api.twitter.com/2/tweets/search/stream/rules",
-        #     auth=self.bearer_oauth,
-        #     json=payload,
-        # )
-        # if response.status_code != 201:
-        #     raise Exception(
-        #         "Cannot add rules (HTTP {}): {}".format(response.status_code, response.text)
-        #     )
         
         response = self.post_to_endpoint(url, payload)
-        logging.debug(f"Rule Addition Respone: {json.dumps(response.json())}")
+        logging.debug(f"Rule Addition Respone: {json.dumps(response)}")
 
         try:
-            if response.json()["errors"]:
+            if response["errors"]:
                 logging.warning("setting rule returned an error: see log file for full response")
-                for num,error in enumerate(response.json()["errors"]):
+                for num,error in enumerate(response["errors"]):
                     logging.warning(f"Error_{num} Title: {error['title']}")
                     logging.warning(f"Error_{num} Value: {error['value']}")
                     logging.warning(f"Error_{num} id: {error['id']}")
@@ -213,9 +174,9 @@ class TwitterStream:
                 return None
         except KeyError:
             info = {
-                "rules":response.json()["data"],
-                "created":response.json()["meta"]["summary"]["created"],
-                "valid":response.json()["meta"]["summary"]["valid"],
+                "rules":response["data"],
+                "created":response["meta"]["summary"]["created"],
+                "valid":response["meta"]["summary"]["valid"],
             }
 
             return info
