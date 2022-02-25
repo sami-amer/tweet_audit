@@ -1,10 +1,14 @@
 from dataclasses import dataclass
+from queue import Queue
+from collections import defaultdict
 import requests
 import os
 import json
 import logging
 import pandas as pd
 import tools
+
+# ! Add logging here to log to a separate file
 
 class TwitterStream:
     """
@@ -229,4 +233,37 @@ class TwitterStream:
         # print(json.dumps(data, indent=4, sort_keys=True))
         logging.info(f"User ID Query Returned: {user_id}")
         return user_id
+@dataclass
+class Tweet:
+    """
+    Represents each tweet after it gets parsed by TweetDB
+    """
 
+    tweet_id: str # better than int due to id lengths
+    tweet_text: str
+    author_id: str = None
+
+    def set_author_id(self, author_id:str) -> None:
+        old_author_id = self.author_id
+        self.author_id = author_id
+        logging.info(f"Updated author_id for tweet: {self.tweet_id} from {old_author_id} to {self.author_id}")
+
+
+@dataclass
+class TweetDB:
+    """
+    Maintains all the tweets that are coming in from the stream. 
+    Allows for text processing to be moved to a different thread to reduce load on Stream thread
+    Maps tweet_ids to Tweet objects
+    """
+
+    q: Queue(0) # ! is this dangerous?
+    tweet_dict: defaultdict(lambda: None)
+
+    # Add methods to add to queue, remove from queue, parse, and add to tweet_dict
+
+    def cache(self,json_response):
+        pass
+
+
+# ! Add Author DB, maps author to tweet items
