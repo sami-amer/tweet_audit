@@ -1,11 +1,13 @@
 import pytest, os
-from classes import TwitterStream
+from classes import TwitterStream, Tweet, TweetDB
 
 # To set your enviornment variables in your terminal run the following line:
 # export 'BEARER_TOKEN'='<your_bearer_token>'
 
 
 bearer_token = os.environ.get("BEARER_TOKEN")
+storage = {}
+db = TweetDB(storage)
 stream = TwitterStream(bearer_token)
 class TestAPI:
     

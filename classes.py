@@ -14,6 +14,7 @@ import pickle
 from multiprocessing import Pipe
 
 # ! Add logging here to log to a separate file
+# ! LOGGING NOT SUPPORTED ACROSS PROCESSES
 logging.basicConfig(filename='classes_LOG.log', level=logging.DEBUG, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger()
 ch = logging.StreamHandler()
@@ -301,7 +302,9 @@ class TweetDB:
     
     def wait_to_wake(self):
         while self.sleep_status:
-            time.sleep(1)
+            time.sleep(60)
+            print("Checking for Queue status")
+            print(f"Queue is empty: {self.q.empty()}")
         self.connect_to_queue()
 
 
@@ -314,23 +317,29 @@ class TweetDB:
 
     def parse(self,tweet_data: dict) -> None:
         tweet_id = tweet_data["data"]["id"]
-        logging.info(f"Parsing Tweet {tweet_id}")
+        print(f"Parsing Tweet {tweet_id}")
         tweet_text = tweet_data["data"]["text"]
         tweet_author = self.db_stream.get_user_from_tweet(tweet_id) # ! add an error catch for this !
         logging.debug(tweet_author)
         self.tweet_dict[tweet_id] = Tweet(tweet_id, tweet_text, tweet_author)
+        print("_"*75)
+        print("Current Tweet Dict is:")
+        print(self.tweet_dict)
     
-    @sleep_db(timeout=1)
+    @sleep_db(timeout=60)
     def connect_to_queue(self):
-        logging.debug("Got to connect_to_queue function")
+        # logging.info("Got to connect_to_queue function")
+        print("queue connect")
         while self.q:
-            logging.debug("inside loop")
+            # logging.debug("inside loop")
             try:
                 json_obj = self.q.get(timeout=5)
-                logging.debug("parsing")
+                # logging.debug("parsing")
+                print("Parsing")
                 self.parse(json_obj)
             except queue.Empty:
-                logging.info("Queue is empty")
+                # logging.info("Queue is empty")
+                print("Q empty")
                 raise queue.Empty
 
     def offload_db(self):
