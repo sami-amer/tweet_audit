@@ -4,4 +4,4 @@ _*
 *.log
 logs/
 *.xlsx
-
+*.pickle

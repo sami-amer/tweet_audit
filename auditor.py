@@ -8,9 +8,11 @@ export 'BEARER_TOKEN'='<your_bearer_token>'
 """ 
 
 import logging, os
+from multiprocessing import Process, Pipe
 import pandas as pd
 import tools
-from classes import TwitterStream
+from classes import TwitterStream, Tweet, TweetDB
+
 
 ## Logging Setup
 logging.basicConfig(filename='AUDIT_LOG.log', level=logging.DEBUG, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -20,13 +22,21 @@ ch.setLevel(logging.INFO)
 ch.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
 logger.addHandler(ch)
 
+# ! IMPLEMENT PIPE
 
 
 if __name__ == '__main__':
     bearer_token = os.environ.get("BEARER_TOKEN")
-    stream = TwitterStream(bearer_token)
-    # ids = [stream.get_user_id("Sami_Amer_PS")["id"], stream.get_user_id("h_jackson_")["id"]]
-    id = "1496934334657409030"
-    # stream.get_user_from_tweet(id)
-    stream.connect()
-    # stream.get_rules()
+    storage = {}
+    db = TweetDB(storage)
+    stream = TwitterStream(bearer_token, db)
+
+
+    api_connect = Process(target=stream.connect())
+    db_connect = Process(target = db.connect_to_queue())
+
+    api_connect.start()
+    db_connect.start()
+
+
+

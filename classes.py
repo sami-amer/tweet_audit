@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from queue import Queue
+import queue
 from collections import defaultdict
 import requests
 import os
@@ -7,19 +8,30 @@ import json
 import logging
 import pandas as pd
 import tools
+import time
+from glob import glob
+import pickle
+from multiprocessing import Pipe
 
 # ! Add logging here to log to a separate file
+logging.basicConfig(filename='classes_LOG.log', level=logging.DEBUG, format='%(asctime)s [%(levelname)s] %(message)s')
+logger = logging.getLogger()
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+ch.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+logger.addHandler(ch)
+
 
 class TwitterStream:
     """
     Python Object to control TwitterAPIv2 stream
     """
 
-    def __init__(self, bearer_token):
+    def __init__(self, bearer_token: str, tweet_db):
         # To set your enviornment variables in your terminal run the following line:
         # export 'BEARER_TOKEN'='<your_bearer_token>'
         self.bearer_token = bearer_token
-        self.tweet_db = {}
+        self.tweet_db = tweet_db
 
     def bearer_oauth(self,r):
         """
@@ -29,7 +41,7 @@ class TwitterStream:
         r.headers["User-Agent"] = "v2UserLookupPython"
         return r
     
-    def get_from_endpoint(self,url:str,params=None) -> json:
+    def get_from_endpoint(self,url:str,params=None) -> dict:
         """
         Connnects to the Twitter API using the given url and params
 
@@ -46,7 +58,7 @@ class TwitterStream:
             )
         return response.json()
 
-    def post_to_endpoint(self,url:str, payload:json) -> json:
+    def post_to_endpoint(self,url:str, payload:dict) -> dict:
         response = requests.post(
             url,
             auth=self.bearer_oauth,
@@ -199,16 +211,18 @@ class TwitterStream:
                     response.status_code, response.text
                 )
             )
-        # ! is container the best way to do this?
-        # ! look into streaming to a python object, then reading that stream on another thread
+
         with open("texts.txt","a") as f: # ! make this stream into a python object as well
             for response_line in response.iter_lines():
                 if response_line:
                     json_response = json.loads(response_line)
-                    to_write = f"ID FOR FOLLOWING TWEET: {json_response['data']['id']}\n" + json_response["data"]["text"] + "\n" + "_"*100
-                    # ? the things we print out will change over time
-                    f.write(to_write)
-                    logging.info(to_write)
+                    self.tweet_db.cache(json_response)
+                    if self.tweet_db.get_sleep_status():
+                        self.tweet_db.sleep_status = False
+                    # to_write = f"ID FOR FOLLOWING TWEET: {json_response['data']['id']}\n" + json_response["data"]["text"] + "\n" + "_"*100
+                    # # ? the things we print out will change over time
+                    # f.write(to_write)
+                    # logging.info(to_write)
 
 
     def add_users(self,user_ids:list[tuple]) -> None:
@@ -257,13 +271,93 @@ class TweetDB:
     Maps tweet_ids to Tweet objects
     """
 
-    q: Queue(0) # ! is this dangerous?
-    tweet_dict: defaultdict(lambda: None)
+    tweet_dict: dict # add some offloading for this
+    q: Queue = Queue(0) # ! make a concrete size as we learn more
+    db_stream: TwitterStream = TwitterStream(os.environ.get("BEARER_TOKEN"),None)
+    sleep_status: bool = False
 
     # Add methods to add to queue, remove from queue, parse, and add to tweet_dict
+    # --- adapted from realpython.org
+    # --- https://realpython.com/python-sleep/
+    def sleep_db(timeout, retry=3):
+        def the_real_decorator(function):
+            def wrapper(self,*args, **kwargs):
+                retries = 0
+                while retries < retry:
+                    try:
+                        value = function(self,*args, **kwargs)
+                        if value is None:
+                            return
+                    except:
+                        logging.info(f'Sleeping for {timeout} seconds')
+                        time.sleep(timeout)
+                        retries += 1
+                self.offload_db()
+                self.sleep_status = True
+                self.wait_to_wake()
+            return wrapper
+        return the_real_decorator
+    # ---
+    
+    def wait_to_wake(self):
+        while self.sleep_status:
+            time.sleep(1)
+        self.connect_to_queue()
 
-    def cache(self,json_response):
-        pass
 
+    def get_sleep_status(self):
+        return self.sleep_status
 
+    def cache(self,json_response: dict) -> None:
+        logging.info(f"Adding to Cache {json_response}")
+        self.q.put(json_response)
+
+    def parse(self,tweet_data: dict) -> None:
+        tweet_id = tweet_data["data"]["id"]
+        logging.info(f"Parsing Tweet {tweet_id}")
+        tweet_text = tweet_data["data"]["text"]
+        tweet_author = self.db_stream.get_user_from_tweet(tweet_id) # ! add an error catch for this !
+        logging.debug(tweet_author)
+        self.tweet_dict[tweet_id] = Tweet(tweet_id, tweet_text, tweet_author)
+    
+    @sleep_db(timeout=1)
+    def connect_to_queue(self):
+        logging.debug("Got to connect_to_queue function")
+        while self.q:
+            logging.debug("inside loop")
+            try:
+                json_obj = self.q.get(timeout=5)
+                logging.debug("parsing")
+                self.parse(json_obj)
+            except queue.Empty:
+                logging.info("Queue is empty")
+                raise queue.Empty
+
+    def offload_db(self):
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        fname = timestr + "_tweetDB.pickle"
+        with open(fname, 'wb') as handle:
+            pickle.dump(self.tweet_dict, handle)
+
+    
 # ! Add Author DB, maps author to tweet items
+# ! Add Local ID:NAME DB
+
+if __name__ == '__main__':
+    storage = {}
+    db = TweetDB(storage)
+    fake_stream = [
+        {"data":{"text":"test text 1", "id": "1496934334657409030"}},
+        {"data":{"text":"test text 2", "id": "1496932851840962565"}},
+        {"data":{"text":"test text 3", "id": "1496931942293512198"}},
+        {"data":{"text":"test text 4", "id": "1496931662785130499"}}]
+
+    for tweet in fake_stream:
+        db.cache(tweet)
+    # for i in range(4):
+    #     print(db.q.get())
+    logging.info(db.get_sleep_status())
+    db.connect_to_queue()
+
+    print(storage)
+    print(db.get_sleep_status())
