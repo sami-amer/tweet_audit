@@ -342,8 +342,8 @@ class TweetStream:
     
     @staticmethod
     def create_loggers() -> None:
-        logging.basicConfig(level=logging.DEBUG, filename="logs/ROOT_LOG.log")
         formatter = logging.Formatter('%(asctime)s [%(name)s][%(levelname)s] %(message)s')
+        logging.basicConfig(level=logging.DEBUG, filename="logs/ROOT_LOG.log", format='%(asctime)s [%(name)s][%(levelname)s] %(message)s')
         log_handler = logging.getLogger('Handler')
         log_db = logging.getLogger('Database')
         log_tweet = logging.getLogger('Tweet')
