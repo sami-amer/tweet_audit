@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pyclbr import Function
 from queue import Queue
-import queue, requests, os, json, logging, time, pickle
+import queue, requests, os, json, logging, time, pickle, sqlite3
 import pandas as pd
 import tools
 from glob import glob
@@ -329,7 +329,20 @@ class TweetDB:
         with open(fname, 'wb') as handle:
             self.logger.info("Dumping current dict to pickle")
             pickle.dump(self.tweet_dict, handle)
+@dataclass
+class TweetDB_SQL(TweetDB):
+    
+    db: sqlite3.Connection = sqlite3.connect("test.db")
 
+    def parse(self, tweet_data: dict, get_author: Function) -> None:
+        tweet_id = tweet_data["data"]["id"]
+        self.logger.info(f"Parsing Tweet {tweet_id}")
+        tweet_text = tweet_data["data"]["text"]
+        self.tweet_dict[tweet_id] = Tweet(tweet_id, tweet_text)
+        tweet_author = get_author(tweet_id) # ! add an error catch for this !
+        self.tweet_dict[tweet_id].set_author_id(tweet_author)
+        self.db.execute("INSERT INTO TWEETS VALUES (?,?,?,?)",(tweet_id,tweet_author,"NA",tweet_text))
+        self.db.commit()
     
 class TweetStream:
     
@@ -338,7 +351,8 @@ class TweetStream:
         self.tweet_dict = {}
         self.tweet_q = Queue(0)
         self.handler = TwitterHandler(bearer_token,logging.getLogger('Handler'))
-        self.database = TweetDB(self.tweet_dict,self.tweet_q,self.handler.get_user_from_tweet,logging.getLogger('Database'))
+        # self.database = TweetDB(self.tweet_dict,self.tweet_q,self.handler.get_user_from_tweet,logging.getLogger('Database'))
+        self.database = TweetDB_SQL(self.tweet_dict,self.tweet_q,self.handler.get_user_from_tweet,logging.getLogger('Database'))
     
     @staticmethod
     def create_loggers() -> None:
