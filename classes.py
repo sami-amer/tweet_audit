@@ -3,7 +3,6 @@ from pyclbr import Function
 from queue import Queue
 import queue, requests, os, json, logging, time, pickle, sqlite3
 import pandas as pd
-import tools
 from glob import glob
 from concurrent.futures import ThreadPoolExecutor
 
