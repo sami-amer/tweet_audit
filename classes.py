@@ -192,6 +192,9 @@ class TwitterHandler:
         )
 
         if response.status_code != 200:
+            self.logger.error("Cannot get stream (HTTP {}): {}".format(
+                    response.status_code, response.text
+                ))
             raise Exception(
                 "Cannot get stream (HTTP {}): {}".format(
                     response.status_code, response.text
@@ -203,7 +206,7 @@ class TwitterHandler:
                 json_response = json.loads(response_line)
                 self.logger.debug(f"json respone: {json_response}")
                 yield json_response
-                
+        self.logger.error("STREAM BROKEN!")
 
     def add_users(self,user_ids:list[tuple]) -> None:
         rules = []
@@ -398,13 +401,13 @@ class SQL_PIPE:
 class TweetStream:
     
     def __init__(self,bearer_token:str, db_path:str):
+        log_root = self.create_loggers()
         self.user_mapping = {}
         with sqlite3.connect(db_path) as conn:
             user_data = conn.execute("SELECT * FROM ID_NAME_MAPPING")
             for data in user_data:
                 self.user_mapping[data[0]] = data[1]
-        print(self.user_mapping)
-        self.create_loggers()
+        log_root.info(self.user_mapping)
         self.tweet_dict = {}
         self.tweet_q = Queue(0)
         self.db_q = Queue(0)
@@ -413,9 +416,10 @@ class TweetStream:
         self.SQL_PIPE = SQL_PIPE(db_path,self.db_q, logging.getLogger("SQL_Database")) # ! Make this modular
     
     @staticmethod
-    def create_loggers() -> None:
+    def create_loggers() -> logging.Logger:
         formatter = logging.Formatter('%(asctime)s [%(name)s][%(levelname)s] %(message)s')
         logging.basicConfig(level=logging.DEBUG, filename="logs/ROOT_LOG.log", format='%(asctime)s [%(name)s][%(levelname)s] %(message)s')
+        log_root = logging.getLogger()
         log_handler = logging.getLogger('Handler')
         log_dict = logging.getLogger('Local_Dict')
         log_sql = logging.getLogger('SQL_Database')
@@ -439,6 +443,8 @@ class TweetStream:
 
         log_sql.addHandler(fh_sql)
         log_sql.addHandler(ch)
+
+        return log_root
 
     def cache(self):
         for json_response in self.handler.stream():

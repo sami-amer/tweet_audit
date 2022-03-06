@@ -23,6 +23,7 @@ from classes import TweetStream
 
 
 if __name__ == '__main__':
+    # ! ADD MORE ERROR CATCHES!
     bearer_token = os.environ.get("BEARER_TOKEN")
     stream = TweetStream(bearer_token,"test.db")
     stream.run()
