@@ -190,8 +190,12 @@ class TwitterHandler:
         """
         Connects to the stream associated with the current BEARER_TOKEN
         """
+        # response = requests.get(
+        #     "https://api.twitter.com/2/tweets/search/stream", auth=self.bearer_oauth, stream=True,
+        # )
+
         response = requests.get(
-            "https://api.twitter.com/2/tweets/search/stream", auth=self.bearer_oauth, stream=True,
+            "https://api.twitter.com/2/tweets/search/stream?expansions=author_id", auth=self.bearer_oauth, stream=True,
         )
 
         if response.status_code != 200:
@@ -211,14 +215,14 @@ class TwitterHandler:
                 yield json_response
         self.logger.error("STREAM BROKEN!")
 
-    def add_users(self,user_ids:list[tuple]) -> None:
-        rules = []
-        for id,tag in user_ids:
-            rules.append({"value": f"from:{id}", "tag": f"{tag}"})
+    # def add_users(self,user_ids:list[tuple]) -> None:
+    #     rules = []
+    #     for id,tag in user_ids:
+    #         rules.append({"value": f"from:{id}", "tag": f"{tag}"})
         
-        for rule in rules:
-            self.logger.info(f"Adding Rule: {rule}")
-        self.set_rules(rules)
+    #     for rule in rules:
+    #         self.logger.info(f"Adding Rule: {rule}")
+    #     self.set_rules(rules)
 
 
     def get_user_from_tweet(self,id: str):
@@ -309,9 +313,10 @@ class TweetDB:
         tweet_id = tweet_data["data"]["id"]
         self.logger.info(f"Parsing Tweet {tweet_id}")
         tweet_text = tweet_data["data"]["text"]
+        tweet_author = tweet_data["data"]["author_id"]
         self.tweet_dict[tweet_id] = Tweet(tweet_id, tweet_text)
-        tweet_author = get_author(tweet_id) # ! add an error catch for this !
-        self.tweet_dict[tweet_id].set_author_id(tweet_author)
+        # tweet_author = get_author(tweet_id) # ! add an error catch for this !
+        # self.tweet_dict[tweet_id].set_author_id(tweet_author)
         self.logger.info("Tweet Parsed, Adding to DB Q")
         self.db_q.put((int(tweet_id),int(tweet_author),self.mapping[int(tweet_author)],str(tweet_text)))
 
@@ -323,7 +328,8 @@ class TweetDB:
             try:
                 json_obj = self.response_q.get(timeout=5)
                 self.logger.debug(f"parsing obj: {json_obj}")
-                self.parse(json_obj, self.get_author)
+                # self.parse(json_obj, self.get_author)
+                self.parse(json_obj)
             except queue.Empty:
                 self.logger.info("Queue is empty")
                 raise queue.Empty
@@ -470,7 +476,6 @@ class TweetStream:
             executor.submit(self.offload)
 
 # ! Add Author DB, maps author to tweet items
-# ! Add Local ID:NAME DB
 
 if __name__ == '__main__':
     bearer_token = os.environ.get("BEARER_TOKEN")
