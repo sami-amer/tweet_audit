@@ -140,7 +140,10 @@ class TwitterHandler:
         url = "https://api.twitter.com/2/tweets/search/stream/rules"
         response = self.post_to_endpoint(url,payload)
 
-        self.logger.debug(f"Rule Deletion Response: {json.dumps(response)}")
+        try:
+            self.logger.debug(f"Rule Deletion Response: {json.dumps(response)}")
+        except:
+            self.logger.debug(f"Rule Deletion Response: {response}")
 
     def delete_rules(self,ids:list) -> None:
         """
