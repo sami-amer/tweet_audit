@@ -344,7 +344,7 @@ class TweetStream:
         log_root = self.create_loggers()
         self.user_mapping = {}
         with sqlite3.connect(db_path) as conn:
-            user_data = conn.execute("SELECT * FROM ID_NAME_MAPPING")
+            user_data = conn.execute("SELECT USER_ID,USER_NAME FROM ID_NAME_MAPPING;")
             for data in user_data:
                 self.user_mapping[data[0]] = data[1]
         log_root.info(self.user_mapping)

@@ -116,8 +116,15 @@ class Toolkit:
             conn.execute("""CREATE TABLE {} (USER_NAME STRING PRIMARY KEY NOT NULL);""".format(table_name))
             conn.executemany("INSERT INTO {} VALUES (?);".format(table_name),users_add)
 
-    def update_user_group_db(self,users,table_name,dp_path):
-        pass
+    def update_user_group_db(self,users,table_name):
+        with sqlite3.connect(self.db_path) as conn:
+            names = conn.execute("SELECT USER_NAME FROM {};".format(table_name))
+            names = [name[0] for name in names]
+        names_set = set(names)
+        users_add = [[name] for name in users if name not in names_set]
+        with sqlite3.connect(self.db_path) as conn:
+            conn.executemany("INSERT INTO {} VALUES (?);".format(table_name),users_add) 
+            
 
     def get_user_id(self,user:str) -> dict:
         """
@@ -198,8 +205,9 @@ if __name__ == '__main__':
         # json.dump(rules,f)
         # rules = json.load(f)
     df = pd.read_csv("_data/senate_usernames_dec21.csv")
-    usernames = df["username"].to_list()
-    # usernames += ["nytimes","KyivIndependent","RT_com","RT_America"]
+    # usernames = df["username"].to_list()
+    usernames = ["nytimes","KyivIndependent","RT_com","RT_America"]
     bearer_token = os.environ.get("BEARER_TOKEN")
     kit = Toolkit(bearer_token,"test.db")
-    # kit.add_user_group_db(usernames, "SENATE_USER_NAMES")
+    # kit.add_user_group_db(usernames, "NEWS_USER_NAMES")
+    kit.update_user_group_db(usernames, "NEWS_USER_NAMES")
