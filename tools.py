@@ -210,4 +210,4 @@ if __name__ == '__main__':
     bearer_token = os.environ.get("BEARER_TOKEN")
     kit = Toolkit(bearer_token,"test.db")
     # kit.add_user_group_db(usernames, "NEWS_USER_NAMES")
-    kit.update_user_group_db(usernames, "NEWS_USER_NAMES")
+    # kit.update_user_group_db(usernames, "NEWS_USER_NAMES")

@@ -184,6 +184,12 @@ class Tweet:
         self.author_id = author_id
         self.logger.debug(f"Updated author_id for tweet: {self.tweet_id} from {old_author_id} to {self.author_id}")
 
+    def __str__(self):
+        return (self.tweet_id,self.author_id, self.tweet_text)
+
+    def get_dict(self):
+        return {"tweet_id": self.tweet_id, "author_id":self.author_id, "tweet_text":self.tweet_text}
+
 
 @dataclass
 class TweetDB:
