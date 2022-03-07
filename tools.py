@@ -6,9 +6,10 @@ from classes import TwitterHandler
 
 class Toolkit:
 
-    def __init__(self,bearer_token):
+    def __init__(self,bearer_token,db_path):
         self.logger = self.create_loggers()
         self.handler = TwitterHandler(bearer_token,self.logger)
+        self.db_path = db_path
 
     def format_rules(self, usernames):
         sorted_users = sorted(usernames,key= len)
@@ -109,8 +110,11 @@ class Toolkit:
         return log_tools
 
 
-    def add_user_group_db(self,users, table_name,db_path):
-        pass
+    def add_user_group_db(self,users: list[str], table_name: str)-> None:
+        users_add = [[user] for user in users]
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""CREATE TABLE {} (USER_NAME STRING PRIMARY KEY NOT NULL);""".format(table_name))
+            conn.executemany("INSERT INTO {} VALUES (?);".format(table_name),users_add)
 
     def update_user_group_db(self,users,table_name,dp_path):
         pass
@@ -177,6 +181,15 @@ class Toolkit:
         # print(json.dumps(data, indent=4, sort_keys=True))
         self.logger.info(f"User ID Query Returned: {user_id}")
         return user_id
+    
+    # def add_users(self,user_ids:list[tuple]) -> None:
+    #     rules = []
+    #     for id,tag in user_ids:
+    #         rules.append({"value": f"from:{id}", "tag": f"{tag}"})
+        
+    #     for rule in rules:
+    #         self.logger.info(f"Adding Rule: {rule}")
+    #     self.handler.set_rules(rules)
 
 if __name__ == '__main__':
     # --- Code to load pickle and usernames from df
@@ -184,8 +197,9 @@ if __name__ == '__main__':
         # rules = pickle.load(f)
         # json.dump(rules,f)
         # rules = json.load(f)
-    # df = pd.read_csv("_data/senate_usernames_dec21.csv")
-    # usernames = df["username"].to_list()
+    df = pd.read_csv("_data/senate_usernames_dec21.csv")
+    usernames = df["username"].to_list()
     # usernames += ["nytimes","KyivIndependent","RT_com","RT_America"]
     bearer_token = os.environ.get("BEARER_TOKEN")
-    kit = Toolkit(bearer_token)
+    kit = Toolkit(bearer_token,"test.db")
+    # kit.add_user_group_db(usernames, "SENATE_USER_NAMES")

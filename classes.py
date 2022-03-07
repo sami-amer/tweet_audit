@@ -165,14 +165,7 @@ class TwitterHandler:
                 yield json_response
         self.logger.error("STREAM BROKEN!")
 
-    # def add_users(self,user_ids:list[tuple]) -> None:
-    #     rules = []
-    #     for id,tag in user_ids:
-    #         rules.append({"value": f"from:{id}", "tag": f"{tag}"})
-        
-    #     for rule in rules:
-    #         self.logger.info(f"Adding Rule: {rule}")
-    #     self.set_rules(rules)
+
 
 
 @dataclass
