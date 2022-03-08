@@ -165,18 +165,18 @@ class TwitterHandler:
                 yield json_response
         self.logger.error("STREAM BROKEN!")
    
-    def get_user_from_tweet(self,id: str):
-        tweet_fields = "tweet.fields=lang,author_id"
-        # ids = "ids=1278747501642657792,1255542774432063488"
-        id = f"ids={id}"
-        url = "https://api.twitter.com/2/tweets?{}&{}".format(id, tweet_fields) # ? Maybe use [text] response to double checK?
+    # def get_user_from_tweet(self,id: str):
+    #     tweet_fields = "tweet.fields=lang,author_id"
+    #     # ids = "ids=1278747501642657792,1255542774432063488"
+    #     id = f"ids={id}"
+    #     url = "https://api.twitter.com/2/tweets?{}&{}".format(id, tweet_fields) # ? Maybe use [text] response to double checK?
 
-        data = self.handler.get_from_endpoint(url)
-        user_id = data["data"][0]["author_id"]
+    #     data = self.handler.get_from_endpoint(url)
+    #     user_id = data["data"][0]["author_id"]
 
-        # print(json.dumps(data, indent=4, sort_keys=True))
-        self.logger.info(f"User ID Query Returned: {user_id}")
-        return user_id
+    #     # print(json.dumps(data, indent=4, sort_keys=True))
+    #     self.logger.info(f"User ID Query Returned: {user_id}")
+    #     return user_id
 
 
 
