@@ -3,7 +3,6 @@ from pyclbr import Function
 from queue import Queue
 import queue, requests, os, json, logging, time, pickle, sqlite3
 import pandas as pd
-from glob import glob
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -164,6 +163,19 @@ class TwitterHandler:
                 self.logger.debug(f"json respone: {json_response}")
                 yield json_response
         self.logger.error("STREAM BROKEN!")
+   
+    def get_user_from_tweet(self,id: str):
+        tweet_fields = "tweet.fields=lang,author_id"
+        # ids = "ids=1278747501642657792,1255542774432063488"
+        id = f"ids={id}"
+        url = "https://api.twitter.com/2/tweets?{}&{}".format(id, tweet_fields) # ? Maybe use [text] response to double checK?
+
+        data = self.handler.get_from_endpoint(url)
+        user_id = data["data"][0]["author_id"]
+
+        # print(json.dumps(data, indent=4, sort_keys=True))
+        self.logger.info(f"User ID Query Returned: {user_id}")
+        return user_id
 
 
 
@@ -246,11 +258,13 @@ class TweetDB:
         self.logger.info(f"Adding to Cache {json_response}")
         self.response_q.put(json_response)
 
-    def parse(self,tweet_data: dict, get_author: Function) -> None:
+    def parse(self,tweet_data: dict) -> None:
         tweet_id = tweet_data["data"]["id"]
         self.logger.info(f"Parsing Tweet {tweet_id}")
         tweet_text = tweet_data["data"]["text"]
+        self.logger.debug(f"Tweet Text: {tweet_text}")
         tweet_author = tweet_data["data"]["author_id"]
+        self.logger.debug(f"Tweet Author: {tweet_author}")
         self.tweet_dict[tweet_id] = Tweet(tweet_id, tweet_text)
         # tweet_author = get_author(tweet_id) # ! add an error catch for this !
         # self.tweet_dict[tweet_id].set_author_id(tweet_author)
@@ -374,11 +388,11 @@ class TweetStream:
         ch.setLevel(logging.INFO)
         ch.setFormatter(formatter)
 
-        fh_handler = logging.FileHandler("logs/HANDLER_LOG.log")
+        fh_handler = logging.FileHandler("logs/HANDLER_LOG.log", mode="w+")
         fh_handler.setFormatter(formatter)
-        fh_dict = logging.FileHandler("logs/DB_LOG.log")
+        fh_dict = logging.FileHandler("logs/DB_LOG.log", mode="w+")
         fh_dict.setFormatter(formatter)
-        fh_sql = logging.FileHandler("logs/SQL_LOG.log")
+        fh_sql = logging.FileHandler("logs/SQL_LOG.log", mode="w+")
         fh_sql.setFormatter(formatter)
 
         log_handler.addHandler(fh_handler)
