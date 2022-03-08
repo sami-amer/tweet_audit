@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pyclbr import Function
 from queue import Queue
-import queue, requests, os, json, logging, time, pickle, sqlite3
+import queue, requests, os, json, logging, time, pickle, sqlite3, warnings
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 
@@ -75,6 +75,7 @@ class TwitterHandler:
             return info, response
         except KeyError:
             self.logger.warning("No Rules Found!")
+            warnings.warn("No Rules Found!")
             return None, response
     
     def delete_all_rules(self,rules_response:json) -> None:
