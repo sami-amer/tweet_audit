@@ -217,7 +217,6 @@ class TweetDB:
     tweet_dict: dict
     response_q: Queue  # ! make a concrete size as we learn more
     db_q: Queue
-    get_author: Function
     mapping: dict
     logger: logging.Logger
     sleep_status: bool = False
@@ -269,7 +268,7 @@ class TweetDB:
         self.logger.debug(f"Tweet Text: {tweet_text}")
         tweet_author = tweet_data["data"]["author_id"]
         self.logger.debug(f"Tweet Author: {tweet_author}")
-        self.tweet_dict[tweet_id] = Tweet(tweet_id, tweet_text)
+        self.tweet_dict[tweet_id] = Tweet(tweet_id, tweet_text,tweet_author)
         # tweet_author = get_author(tweet_id) # ! add an error catch for this !
         # self.tweet_dict[tweet_id].set_author_id(tweet_author)
         self.logger.info("Tweet Parsed, Adding to DB Q")
@@ -390,7 +389,6 @@ class TweetStream:
             self.tweet_dict,
             self.tweet_q,
             self.db_q,
-            self.handler.get_user_from_tweet,
             self.user_mapping,
             logging.getLogger("Local_Dict"),
         )

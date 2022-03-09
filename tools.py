@@ -2,7 +2,7 @@ import requests, pickle
 import os
 import logging, sqlite3
 import pandas as pd
-from classes import TwitterHandler
+from classesv1 import TwitterHandler
 
 
 class Toolkit:

@@ -8,7 +8,7 @@ export 'BEARER_TOKEN'='<your_bearer_token>'
 """
 
 import logging, os
-from classes import TweetStream
+from classesv2 import TweetStream
 
 
 if __name__ == "__main__":
