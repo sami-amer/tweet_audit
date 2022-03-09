@@ -6,7 +6,6 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 
 
-
 class TwitterHandler:
     """
     Python Object to control TwitterAPIv2 stream
@@ -18,23 +17,23 @@ class TwitterHandler:
         self.bearer_token = bearer_token
         self.logger = logger
 
-    def bearer_oauth(self,r):
+    def bearer_oauth(self, r):
         """
         Method required by bearer token authentication.
         """
         r.headers["Authorization"] = f"Bearer {self.bearer_token}"
         r.headers["User-Agent"] = "v2UserLookupPython"
         return r
-    
-    def get_from_endpoint(self,url:str,params=None) -> dict:
+
+    def get_from_endpoint(self, url: str, params=None) -> dict:
         """
         Connnects to the Twitter API using the given url and params
 
         Arguments:
-            url     (str): the url genereated by a function 
+            url     (str): the url genereated by a function
             params  (str): parameters that need to be passed with the url [optional]
         """
-        response = requests.request("GET", url, auth=self.bearer_oauth,params=params)
+        response = requests.request("GET", url, auth=self.bearer_oauth, params=params)
         if response.status_code != 200:
             raise Exception(
                 "Request returned an error: {} {}".format(
@@ -43,12 +42,8 @@ class TwitterHandler:
             )
         return response.json()
 
-    def post_to_endpoint(self,url:str, payload:dict) -> dict:
-        response = requests.post(
-            url,
-            auth=self.bearer_oauth,
-            json=payload
-        )
+    def post_to_endpoint(self, url: str, payload: dict) -> dict:
+        response = requests.post(url, auth=self.bearer_oauth, json=payload)
         if response.status_code != 200:
             raise Exception(
                 "Cannot delete rules (HTTP {}): {}".format(
@@ -67,18 +62,15 @@ class TwitterHandler:
         try:
             data = response["data"]
             meta = response["meta"]
-            info = {
-            "rules": data,
-            "rule_count":meta["result_count"]
-        }
+            info = {"rules": data, "rule_count": meta["result_count"]}
             self.logger.info(info)
             return info, response
         except KeyError:
             self.logger.warning("No Rules Found!")
             warnings.warn("No Rules Found!")
             return None, response
-    
-    def delete_all_rules(self,rules_response:json) -> None:
+
+    def delete_all_rules(self, rules_response: json) -> None:
         """
         Deletes all the rules on the stream associated with the current BEARER_TOKEN
         """
@@ -88,14 +80,14 @@ class TwitterHandler:
         ids = list(map(lambda rule: rule["id"], rules_response["data"]))
         payload = {"delete": {"ids": ids}}
         url = "https://api.twitter.com/2/tweets/search/stream/rules"
-        response = self.post_to_endpoint(url,payload)
+        response = self.post_to_endpoint(url, payload)
 
         try:
             self.logger.debug(f"Rule Deletion Response: {json.dumps(response)}")
         except:
             self.logger.debug(f"Rule Deletion Response: {response}")
 
-    def delete_rules(self,ids:list) -> None:
+    def delete_rules(self, ids: list) -> None:
         """
         Deletes specific rules on the stream associated with the current BEARER_TOKEN
 
@@ -105,33 +97,35 @@ class TwitterHandler:
         payload = {"delete": {"ids": ids}}
         url = "https://api.twitter.com/2/tweets/search/stream/rules"
 
-        response = self.post_to_endpoint(url, payload) 
+        response = self.post_to_endpoint(url, payload)
         self.logger.debug(f"Rule Deletion Response: {json.dumps(response)}")
 
-    def set_rules(self,rules: list[dict]) -> dict or None:
+    def set_rules(self, rules: list[dict]) -> dict or None:
         """
-        Adds given rules to the stream associated with the current BEARER_TOKEN 
+        Adds given rules to the stream associated with the current BEARER_TOKEN
         """
-        payload = {"add":rules}
+        payload = {"add": rules}
         url = "https://api.twitter.com/2/tweets/search/stream/rules"
-        
+
         response = self.post_to_endpoint(url, payload)
         self.logger.debug(f"Rule Addition Respone: {json.dumps(response)}")
 
         try:
             if response["errors"]:
-                self.logger.warning("setting rule returned an error: see log file for full response")
-                for num,error in enumerate(response["errors"]):
+                self.logger.warning(
+                    "setting rule returned an error: see log file for full response"
+                )
+                for num, error in enumerate(response["errors"]):
                     self.logger.warning(f"Error_{num} Title: {error['title']}")
                     self.logger.warning(f"Error_{num} Value: {error['value']}")
                     self.logger.warning(f"Error_{num} id: {error['id']}")
-                
+
                 return None
         except KeyError:
             info = {
-                "rules":response["data"],
-                "created":response["meta"]["summary"]["created"],
-                "valid":response["meta"]["summary"]["valid"],
+                "rules": response["data"],
+                "created": response["meta"]["summary"]["created"],
+                "valid": response["meta"]["summary"]["valid"],
             }
 
             return info
@@ -145,13 +139,17 @@ class TwitterHandler:
         # )
 
         response = requests.get(
-            "https://api.twitter.com/2/tweets/search/stream?expansions=author_id", auth=self.bearer_oauth, stream=True,
+            "https://api.twitter.com/2/tweets/search/stream?expansions=author_id",
+            auth=self.bearer_oauth,
+            stream=True,
         )
 
         if response.status_code != 200:
-            self.logger.error("Cannot get stream (HTTP {}): {}".format(
+            self.logger.error(
+                "Cannot get stream (HTTP {}): {}".format(
                     response.status_code, response.text
-                ))
+                )
+            )
             raise Exception(
                 "Cannot get stream (HTTP {}): {}".format(
                     response.status_code, response.text
@@ -164,7 +162,7 @@ class TwitterHandler:
                 self.logger.debug(f"json respone: {json_response}")
                 yield json_response
         self.logger.error("STREAM BROKEN!")
-   
+
     # def get_user_from_tweet(self,id: str):
     #     tweet_fields = "tweet.fields=lang,author_id"
     #     # ids = "ids=1278747501642657792,1255542774432063488"
@@ -179,71 +177,77 @@ class TwitterHandler:
     #     return user_id
 
 
-
-
 @dataclass
 class Tweet:
     """
     Represents each tweet after it gets parsed by TweetDB
     """
 
-    tweet_id: str # better than int due to id lengths
+    tweet_id: str  # better than int due to id lengths
     tweet_text: str
     author_id: str = None
     logger: logging.Logger = logging.getLogger()
 
-    def set_author_id(self, author_id:str) -> None:
+    def set_author_id(self, author_id: str) -> None:
         old_author_id = self.author_id
         self.author_id = author_id
-        self.logger.debug(f"Updated author_id for tweet: {self.tweet_id} from {old_author_id} to {self.author_id}")
+        self.logger.debug(
+            f"Updated author_id for tweet: {self.tweet_id} from {old_author_id} to {self.author_id}"
+        )
 
     def __str__(self):
-        return (self.tweet_id,self.author_id, self.tweet_text)
+        return (self.tweet_id, self.author_id, self.tweet_text)
 
     def get_dict(self):
-        return {"tweet_id": self.tweet_id, "author_id":self.author_id, "tweet_text":self.tweet_text}
+        return {
+            "tweet_id": self.tweet_id,
+            "author_id": self.author_id,
+            "tweet_text": self.tweet_text,
+        }
 
 
 @dataclass
 class TweetDB:
     """
-    Maintains all the tweets that are coming in from the stream. 
+    Maintains all the tweets that are coming in from the stream.
     Allows for text processing to be moved to a different thread to reduce load on Stream thread
     Maps tweet_ids to Tweet objects
     """
 
     tweet_dict: dict
-    response_q: Queue # ! make a concrete size as we learn more
+    response_q: Queue  # ! make a concrete size as we learn more
     db_q: Queue
     get_author: Function
     mapping: dict
     logger: logging.Logger
     sleep_status: bool = False
 
-
     # --- adapted from realpython.org
     # --- https://realpython.com/python-sleep/
     def sleep_db(timeout, retry=3):
         def the_real_decorator(function):
-            def wrapper(self,*args, **kwargs):
+            def wrapper(self, *args, **kwargs):
                 retries = 0
                 while retries < retry:
                     try:
-                        value = function(self,*args, **kwargs)
+                        value = function(self, *args, **kwargs)
                         if value is None:
                             return
                     except:
-                        self.logger.info(f'Sleeping for {timeout} seconds')
+                        self.logger.info(f"Sleeping for {timeout} seconds")
                         time.sleep(timeout)
                         retries += 1
                 self.offload_db()
                 self.logger.info("Sleeping DB")
                 self.sleep_status = True
                 self.wait_to_wake()
+
             return wrapper
+
         return the_real_decorator
+
     # ---
-    
+
     def wait_to_wake(self):
         while self.sleep_status:
             time.sleep(60)
@@ -251,15 +255,14 @@ class TweetDB:
             self.logger.info(f"Queue is empty: {self.response_q.empty()}")
         self.connect_to_queue()
 
-
     def get_sleep_status(self):
         return self.sleep_status
 
-    def cache(self,json_response: dict) -> None:
+    def cache(self, json_response: dict) -> None:
         self.logger.info(f"Adding to Cache {json_response}")
         self.response_q.put(json_response)
 
-    def parse(self,tweet_data: dict) -> None:
+    def parse(self, tweet_data: dict) -> None:
         tweet_id = tweet_data["data"]["id"]
         self.logger.info(f"Parsing Tweet {tweet_id}")
         tweet_text = tweet_data["data"]["text"]
@@ -270,9 +273,15 @@ class TweetDB:
         # tweet_author = get_author(tweet_id) # ! add an error catch for this !
         # self.tweet_dict[tweet_id].set_author_id(tweet_author)
         self.logger.info("Tweet Parsed, Adding to DB Q")
-        self.db_q.put((int(tweet_id),int(tweet_author),self.mapping[int(tweet_author)],str(tweet_text)))
+        self.db_q.put(
+            (
+                int(tweet_id),
+                int(tweet_author),
+                self.mapping[int(tweet_author)],
+                str(tweet_text),
+            )
+        )
 
-    
     @sleep_db(timeout=60)
     def connect_to_queue(self):
         self.logger.debug("Got to connect_to_queue function")
@@ -288,40 +297,43 @@ class TweetDB:
 
     def offload_db(self):
         timestr = time.strftime("%Y%m%d-%H%M%S")
-        fname = "_data/pickles/"+timestr + "_tweetDB.pickle"
-        with open(fname, 'wb') as handle:
+        fname = "_data/pickles/" + timestr + "_tweetDB.pickle"
+        with open(fname, "wb") as handle:
             self.logger.info("Dumping current dict to pickle")
             pickle.dump(self.tweet_dict, handle)
-    
-class SQL_PIPE:
 
-    def __init__(self,db_path,db_q, logger: logging.Logger):
+
+class SQLPipe:
+    def __init__(self, db_path, db_q, logger: logging.Logger):
         self.db_path = db_path
         self.db_q = db_q
         self.logger = logger
         self.sleep_status = False
-    
+
     # --- adapted from realpython.org
     # --- https://realpython.com/python-sleep/
     def sleep_db(timeout, retry=3):
         def the_real_decorator(function):
-            def wrapper(self,*args, **kwargs):
+            def wrapper(self, *args, **kwargs):
                 retries = 0
                 while retries < retry:
                     try:
-                        value = function(self,*args, **kwargs)
+                        value = function(self, *args, **kwargs)
                         if value is None:
                             return
                     except:
-                        self.logger.info(f'Sleeping for {timeout} seconds')
+                        self.logger.info(f"Sleeping for {timeout} seconds")
                         time.sleep(timeout)
                         retries += 1
                 self.logger.info("Sleeping SQL DB")
                 self.sleep_status = True
                 self.wait_to_wake()
                 self.db.commit()
+
             return wrapper
+
         return the_real_decorator
+
     # ---
 
     def get_sleep_status(self):
@@ -334,18 +346,19 @@ class SQL_PIPE:
             self.logger.info(f"Queue is empty: {self.db_q.empty()}")
         self.connect_to_queue()
 
-
-    def execute_SQL(self,insert_values):
+    def execute_SQL(self, insert_values):
         self.logger.info("Executing SQL Commands")
         with sqlite3.connect(self.db_path) as conn:
             try:
-                conn.execute("""INSERT INTO TWEETS (TWEET_ID,AUTHOR_ID,AUTHOR_NAME,TWEET_TEXT) VALUES (?,?,?,?)""",insert_values)
+                conn.execute(
+                    """INSERT INTO TWEETS (TWEET_ID,AUTHOR_ID,AUTHOR_NAME,TWEET_TEXT) VALUES (?,?,?,?)""",
+                    insert_values,
+                )
             except sqlite3.Error as err:
                 self.logger.error("Failure to add data")
                 self.logger.error(err)
             conn.commit()
             self.logger.info("Change Commited")
-
 
     @sleep_db(timeout=60)
     def connect_to_queue(self):
@@ -358,10 +371,10 @@ class SQL_PIPE:
             except queue.Empty:
                 self.logger.info("Queue is empty")
                 raise queue.Empty
-        
+
+
 class TweetStream:
-    
-    def __init__(self,bearer_token:str, db_path:str):
+    def __init__(self, bearer_token: str, db_path: str):
         log_root = self.create_loggers()
         self.user_mapping = {}
         with sqlite3.connect(db_path) as conn:
@@ -372,18 +385,33 @@ class TweetStream:
         self.tweet_dict = {}
         self.tweet_q = Queue(0)
         self.db_q = Queue(0)
-        self.handler = TwitterHandler(bearer_token,logging.getLogger('Handler'))
-        self.database = TweetDB(self.tweet_dict,self.tweet_q,self.db_q,self.handler.get_user_from_tweet,self.user_mapping,logging.getLogger('Local_Dict'))
-        self.SQL_PIPE = SQL_PIPE(db_path,self.db_q, logging.getLogger("SQL_Database")) # ! Make this modular
-    
+        self.handler = TwitterHandler(bearer_token, logging.getLogger("Handler"))
+        self.database = TweetDB(
+            self.tweet_dict,
+            self.tweet_q,
+            self.db_q,
+            self.handler.get_user_from_tweet,
+            self.user_mapping,
+            logging.getLogger("Local_Dict"),
+        )
+        self.SQL_PIPE = SQLPipe(
+            db_path, self.db_q, logging.getLogger("SQL_Database")
+        )  # ! Make this modular
+
     @staticmethod
     def create_loggers() -> logging.Logger:
-        formatter = logging.Formatter('%(asctime)s [%(name)s][%(levelname)s] %(message)s')
-        logging.basicConfig(level=logging.DEBUG, filename="logs/ROOT_LOG.log", format='%(asctime)s [%(name)s][%(levelname)s] %(message)s')
+        formatter = logging.Formatter(
+            "%(asctime)s [%(name)s][%(levelname)s] %(message)s"
+        )
+        logging.basicConfig(
+            level=logging.DEBUG,
+            filename="logs/ROOT_LOG.log",
+            format="%(asctime)s [%(name)s][%(levelname)s] %(message)s",
+        )
         log_root = logging.getLogger()
-        log_handler = logging.getLogger('Handler')
-        log_dict = logging.getLogger('Local_Dict')
-        log_sql = logging.getLogger('SQL_Database')
+        log_handler = logging.getLogger("Handler")
+        log_dict = logging.getLogger("Local_Dict")
+        log_sql = logging.getLogger("SQL_Database")
 
         ch = logging.StreamHandler()
         ch.setLevel(logging.INFO)
@@ -417,19 +445,20 @@ class TweetStream:
 
     def parse(self):
         self.database.connect_to_queue()
-    
+
     def offload(self):
         self.SQL_PIPE.connect_to_queue()
-    
+
     def run(self):
         with ThreadPoolExecutor(4) as executor:
             executor.submit(self.cache)
             executor.submit(self.parse)
             executor.submit(self.offload)
 
+
 # ! Add Author DB, maps author to tweet items
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     bearer_token = os.environ.get("BEARER_TOKEN")
-    stream = TweetStream(bearer_token,"test.db")
+    stream = TweetStream(bearer_token, "test.db")
     stream.run()

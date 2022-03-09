@@ -4,7 +4,7 @@ import pytest, os, logging
 from classes import TweetStream, Tweet, TweetDB, TwitterHandler
 from unittest.mock import Mock, patch
 
-formatter = logging.Formatter('%(asctime)s [%(name)s][%(levelname)s] %(message)s')
+formatter = logging.Formatter("%(asctime)s [%(name)s][%(levelname)s] %(message)s")
 log_tester = logging.getLogger("Tester")
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
@@ -19,7 +19,8 @@ log_tester.addHandler(ch)
 # export 'BEARER_TOKEN'='<your_bearer_token>'
 bearer_token = os.environ.get("BEARER_TOKEN")
 
-class Test_Handler_API:
+
+class TestHandlerAPI:
     # Uses 3 API Calls total
     # def test_get_user_id(self):
     #     # This test asserts using my twitter account
@@ -38,7 +39,7 @@ class Test_Handler_API:
     #     handler = TwitterHandler(bearer_token, log_tester)
     #     tweet_id = "1443636712928915459"
     #     user_id = "1327422172818788353"
-    #     assert handler.get_user_from_tweet(tweet_id) == user_id 
+    #     assert handler.get_user_from_tweet(tweet_id) == user_id
 
     def test_get_from_endpoint(self):
         handler = TwitterHandler(bearer_token, log_tester)

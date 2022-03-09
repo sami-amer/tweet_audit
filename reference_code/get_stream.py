@@ -40,7 +40,7 @@ def delete_all_rules(rules):
     response = requests.post(
         "https://api.twitter.com/2/tweets/search/stream/rules",
         auth=bearer_oauth,
-        json=payload
+        json=payload,
     )
     if response.status_code != 200:
         raise Exception(
@@ -60,8 +60,9 @@ def set_rules(delete):
     rules = [
         {"value": "from:2899773086"},
         {"value": "from:Wario64"},
-        {"value": "from:763099930487615488 "}]
-    payload = {"add":rules}
+        {"value": "from:763099930487615488 "},
+    ]
+    payload = {"add": rules}
     response = requests.post(
         "https://api.twitter.com/2/tweets/search/stream/rules",
         auth=bearer_oauth,
@@ -76,7 +77,9 @@ def set_rules(delete):
 
 def get_stream(set):
     response = requests.get(
-        "https://api.twitter.com/2/tweets/search/stream", auth=bearer_oauth, stream=True,
+        "https://api.twitter.com/2/tweets/search/stream",
+        auth=bearer_oauth,
+        stream=True,
     )
     print(response.status_code)
     if response.status_code != 200:
@@ -85,13 +88,12 @@ def get_stream(set):
                 response.status_code, response.text
             )
         )
-    with open("texts.txt","a+") as f:
+    with open("texts.txt", "a+") as f:
         for response_line in response.iter_lines():
             if response_line:
                 json_response = json.loads(response_line)
                 print(json.dumps(json_response, indent=4, sort_keys=True))
                 f.write(json_response["data"]["text"])
-            
 
 
 def main():
