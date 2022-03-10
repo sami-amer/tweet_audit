@@ -232,5 +232,7 @@ if __name__ == "__main__":
     usernames = ["nytimes", "KyivIndependent", "RT_com", "RT_America"]
     bearer_token = os.environ.get("BEARER_TOKEN")
     kit = Toolkit(bearer_token, "test.db")
+    # for user in usernames:
+    #     print(kit.get_user_id(user))
     # kit.add_user_group_db(usernames, "NEWS_USER_NAMES")
     # kit.update_user_group_db(usernames, "NEWS_USER_NAMES")

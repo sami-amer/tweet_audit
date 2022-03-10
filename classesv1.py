@@ -361,7 +361,7 @@ class SQLPipe:
 
     @sleep_db(timeout=60)
     def connect_to_queue(self):
-        self.logger.debug("Got to connect_to_queue function")
+        self.logger.debug("Got to connect_to_queue SQL")
         while self.db_q:
             try:
                 sql_values = self.db_q.get(timeout=5)

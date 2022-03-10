@@ -1,9 +1,31 @@
 from dataclasses import dataclass
+from http.client import responses
 from pyclbr import Function
 from queue import Queue
 import queue, requests, os, json, logging, time, pickle, sqlite3, warnings
+import threading
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+
+class fakeTwitterHandler:
+    def __init__(self, logger) -> None:
+        self.logger = logger
+        self.responses = [
+            {'data': {'author_id': '247334603', 'id': '1501685993916841991', 'text': 'As we develop climate policy, we must recognize the disproportionate impact natural disasters &amp; inaccessible resources have on women. This week, I joined @maziehirono to intro the Women &amp; Climate Change Act to ensure the US advances equitable climate solutions that work for all. https://t.co/nbWQJXPBo3'}, 'includes': {'users': [{'id': '247334603', 'name': 'Senator Dick Durbin', 'username': 'SenatorDurbin'}, {'id': '92186819', 'name': 'Senator Mazie Hirono', 'username': 'maziehirono'}]}, 'matching_rules': [{'id': '1500677568919392257', 'tag': '501'}]},
+            {'data': {'author_id': '1099199839', 'id': '1501685742355066892', 'text': 'RT @uspirg: Did you know that gas stoves can emit air pollutants in your home at levels exceeding EPA regulations for outdoor air quality?…'}, 'includes': {'users': [{'id': '1099199839', 'name': 'Martin Heinrich', 'username': 'MartinHeinrich'}, {'id': '42660729', 'name': 'U.S. PIRG', 'username': 'uspirg'}]}, 'matching_rules': [{'id': '1500677568919392261', 'tag': '505'}]}
+        ]
+
+    def stream(self):
+        # for response_line in self.responses:
+        #     time.sleep(10)
+        #     # if response_line:
+        #     #     json_response = json.loads(response_line)
+        #     self.logger.info("output fake json")
+        #     yield response_line
+        while True:
+            time.sleep(10)
+            yield self.responses[0]
 
 
 class TwitterHandler:
@@ -206,20 +228,14 @@ class Tweet:
         }
 
 
-@dataclass
-class TweetDB:
-    """
-    Maintains all the tweets that are coming in from the stream.
-    Allows for text processing to be moved to a different thread to reduce load on Stream thread
-    Maps tweet_ids to Tweet objects
-    """
 
-    tweet_dict: dict
-    response_q: Queue  # ! make a concrete size as we learn more
-    db_q: Queue
-    mapping: dict
-    logger: logging.Logger
-    sleep_status: bool = False
+class SQLPipe:
+    def __init__(self, db_path, db_q,events:dict, logger: logging.Logger):
+        self.db_path = db_path
+        self.db_q = db_q
+        self.events = events
+        self.logger = logger
+        self.sleep_status = True
 
     # --- adapted from realpython.org
     # --- https://realpython.com/python-sleep/
@@ -233,12 +249,96 @@ class TweetDB:
                         if value is None:
                             return
                     except:
-                        self.logger.info(f"Sleeping for {timeout} seconds")
+                        self.logger.info(f"Sleeping SQL for {timeout} seconds")
+                        time.sleep(timeout)
+                        retries += 1
+                self.logger.info("Sleeping SQL DB")
+                self.events['sql'].clear()
+                self.wait_to_wake()
+
+            return wrapper
+
+        return the_real_decorator
+
+    # ---
+
+    def get_sleep_status(self):
+        return self.sleep_status
+
+    def wait_to_wake(self):
+        # while self.sleep_status:
+        #     time.sleep(60)
+        #     self.logger.info("Checking for Queue status")
+        #     self.logger.info(f"Queue is empty: {self.db_q.empty()}")
+        self.logger.info("Waiting...")
+        self.events['sql'].wait()
+        self.connect_to_queue()
+
+    def execute_SQL(self, insert_values):
+        self.logger.info("Executing SQL Commands")
+        with sqlite3.connect(self.db_path) as conn:
+            try:
+                conn.execute(
+                    """INSERT INTO TWEETS (TWEET_ID,AUTHOR_ID,AUTHOR_NAME,TWEET_TEXT) VALUES (?,?,?,?)""",
+                    insert_values,
+                )
+                conn.commit()
+            except sqlite3.Error as err:
+                self.logger.error("Failure to add data")
+                self.logger.error(err)
+                conn.commit()
+            self.logger.info("Change Commited")
+
+    # @sleep_db(timeout=10)
+    def connect_to_queue(self):
+        self.logger.debug(f"SQL Thread Unlocked:{self.events['sql'].is_set()}")
+        self.events['sql'].wait()
+        self.logger.debug("Got to connect_to_queue function SQL")
+        while self.db_q:
+            try:
+                sql_values = self.db_q.get(timeout=10)
+                self.logger.debug(f"parsing values: {sql_values}")
+                self.execute_SQL(sql_values)
+            except queue.Empty:
+                self.logger.info("Queue is empty, sleeping")
+                self.logger.info("Sleeping SQL DB")
+                self.events['sql'].clear()
+                self.wait_to_wake()
+
+                # raise queue.Empty
+class TweetDB:
+    """
+    Maintains all the tweets that are coming in from the stream.
+    Allows for text processing to be moved to a different thread to reduce load on Stream thread
+    Maps tweet_ids to Tweet objects
+    """
+
+    def __init__(self,tweet_dict:dict,response_q:Queue,db_q:Queue,events: dict[Event],id_mapping: dict,logger: logging.Logger):
+        self.tweet_dict = tweet_dict
+        self.response_q = response_q
+        self.events = events
+        self.id_mapping = id_mapping
+        self.db_q = db_q
+        self.logger = logger
+
+    # --- adapted from realpython.org
+    # --- https://realpython.com/python-sleep/
+    def sleep_db(timeout, retry=3):
+        def the_real_decorator(function):
+            def wrapper(self, *args, **kwargs):
+                retries = 0
+                while retries < retry:
+                    try:
+                        value = function(self, *args, **kwargs)
+                        if value is None:
+                            return
+                    except:
+                        self.logger.info(f"Sleeping DB for {timeout} seconds")
                         time.sleep(timeout)
                         retries += 1
                 self.offload_db()
                 self.logger.info("Sleeping DB")
-                self.sleep_status = True
+                self.events['local_db'].clear()
                 self.wait_to_wake()
 
             return wrapper
@@ -248,10 +348,12 @@ class TweetDB:
     # ---
 
     def wait_to_wake(self):
-        while self.sleep_status:
-            time.sleep(60)
-            self.logger.info("Checking for Queue status")
-            self.logger.info(f"Queue is empty: {self.response_q.empty()}")
+        # while self.sleep_status:
+        #     time.sleep(60)
+        #     self.logger.info("Checking for Queue status")
+        #     self.logger.info(f"Queue is empty: {self.response_q.empty()}")
+        self.logger.info("Waiting...")
+        self.events['local_db'].wait()
         self.connect_to_queue()
 
     def get_sleep_status(self):
@@ -260,6 +362,8 @@ class TweetDB:
     def cache(self, json_response: dict) -> None:
         self.logger.info(f"Adding to Cache {json_response}")
         self.response_q.put(json_response)
+        self.events['local_db'].set()
+        self.logger.info(f"Local DB awoken {self.events['local_db'].is_set()}!")
 
     def parse(self, tweet_data: dict) -> None:
         tweet_id = tweet_data["data"]["id"]
@@ -271,28 +375,47 @@ class TweetDB:
         self.tweet_dict[tweet_id] = Tweet(tweet_id, tweet_text,tweet_author)
         # tweet_author = get_author(tweet_id) # ! add an error catch for this !
         # self.tweet_dict[tweet_id].set_author_id(tweet_author)
-        self.logger.info("Tweet Parsed, Adding to DB Q")
-        self.db_q.put(
+        try:
+            self.db_q.put(
             (
                 int(tweet_id),
                 int(tweet_author),
-                self.mapping[int(tweet_author)],
+                self.id_mapping[int(tweet_author)],
                 str(tweet_text),
             )
         )
+        except KeyError:
+            self.logger.warning(f"Mapping unavailable for {tweet_author}")
 
-    @sleep_db(timeout=60)
+        except:
+            self.logger.error("UNKNOWN EXCEPTION")
+        
+        self.logger.info("Tweet Parsed, Adding to DB Q")
+
+
+    # @sleep_db(timeout=1)
     def connect_to_queue(self):
-        self.logger.debug("Got to connect_to_queue function")
+        self.logger.debug(f"Local DB Unlocked: {self.events['local_db'].is_set()}")
+        self.events['local_db'].wait()
+        self.logger.debug("Got to connect_to_queue function DB")
         while self.response_q:
             try:
-                json_obj = self.response_q.get(timeout=5)
+                json_obj = self.response_q.get(timeout=10)
                 self.logger.debug(f"parsing obj: {json_obj}")
                 # self.parse(json_obj, self.get_author)
                 self.parse(json_obj)
+                self.logger.debug(f"SQL DB Unlocked {self.events['sql'].is_set()}")
+                if not self.events['sql'].is_set():
+                    self.logger.debug(f"Unlocking SQL DB Thread")
+                    self.events['sql'].set()
             except queue.Empty:
-                self.logger.info("Queue is empty")
-                raise queue.Empty
+                self.logger.info("Queue is empty, sleeping")
+                self.offload_db()
+                self.logger.info("Sleeping DB")
+                self.events['local_db'].clear()
+                self.wait_to_wake()
+
+                # raise queue.Empty
 
     def offload_db(self):
         timestr = time.strftime("%Y%m%d-%H%M%S")
@@ -302,99 +425,37 @@ class TweetDB:
             pickle.dump(self.tweet_dict, handle)
 
 
-class SQLPipe:
-    def __init__(self, db_path, db_q, logger: logging.Logger):
-        self.db_path = db_path
-        self.db_q = db_q
-        self.logger = logger
-        self.sleep_status = False
-
-    # --- adapted from realpython.org
-    # --- https://realpython.com/python-sleep/
-    def sleep_db(timeout, retry=3):
-        def the_real_decorator(function):
-            def wrapper(self, *args, **kwargs):
-                retries = 0
-                while retries < retry:
-                    try:
-                        value = function(self, *args, **kwargs)
-                        if value is None:
-                            return
-                    except:
-                        self.logger.info(f"Sleeping for {timeout} seconds")
-                        time.sleep(timeout)
-                        retries += 1
-                self.logger.info("Sleeping SQL DB")
-                self.sleep_status = True
-                self.wait_to_wake()
-                self.db.commit()
-
-            return wrapper
-
-        return the_real_decorator
-
-    # ---
-
-    def get_sleep_status(self):
-        return self.sleep_status
-
-    def wait_to_wake(self):
-        while self.sleep_status:
-            time.sleep(60)
-            self.logger.info("Checking for Queue status")
-            self.logger.info(f"Queue is empty: {self.db_q.empty()}")
-        self.connect_to_queue()
-
-    def execute_SQL(self, insert_values):
-        self.logger.info("Executing SQL Commands")
-        with sqlite3.connect(self.db_path) as conn:
-            try:
-                conn.execute(
-                    """INSERT INTO TWEETS (TWEET_ID,AUTHOR_ID,AUTHOR_NAME,TWEET_TEXT) VALUES (?,?,?,?)""",
-                    insert_values,
-                )
-            except sqlite3.Error as err:
-                self.logger.error("Failure to add data")
-                self.logger.error(err)
-            conn.commit()
-            self.logger.info("Change Commited")
-
-    @sleep_db(timeout=60)
-    def connect_to_queue(self):
-        self.logger.debug("Got to connect_to_queue function")
-        while self.db_q:
-            try:
-                sql_values = self.db_q.get(timeout=5)
-                self.logger.debug(f"parsing values: {sql_values}")
-                self.execute_SQL(sql_values)
-            except queue.Empty:
-                self.logger.info("Queue is empty")
-                raise queue.Empty
 
 
 class TweetStream:
     def __init__(self, bearer_token: str, db_path: str):
-        log_root = self.create_loggers()
+        self.log_root = self.create_loggers()
         self.user_mapping = {}
         with sqlite3.connect(db_path) as conn:
             user_data = conn.execute("SELECT USER_ID,USER_NAME FROM ID_NAME_MAPPING;")
             for data in user_data:
                 self.user_mapping[data[0]] = data[1]
-        log_root.info(self.user_mapping)
+        # self.log_root.info(self.user_mapping)
         self.tweet_dict = {}
         self.tweet_q = Queue(0)
         self.db_q = Queue(0)
+
+        self.events = {"local_db":Event(),"sql":Event()}
+        # self.events['local_db'].set()
+        # self.events['sql'].set()
         self.handler = TwitterHandler(bearer_token, logging.getLogger("Handler"))
+        # self.handler = fakeTwitterHandler(logging.getLogger("Handler"))
+        self.SQL_PIPE = SQLPipe(
+            db_path, self.db_q,self.events, logging.getLogger("SQL_Database")
+        ) 
         self.database = TweetDB(
             self.tweet_dict,
             self.tweet_q,
             self.db_q,
+            self.events,
             self.user_mapping,
             logging.getLogger("Local_Dict"),
         )
-        self.SQL_PIPE = SQLPipe(
-            db_path, self.db_q, logging.getLogger("SQL_Database")
-        )  # ! Make this modular
 
     @staticmethod
     def create_loggers() -> logging.Logger:
@@ -406,6 +467,9 @@ class TweetStream:
             filename="logs/ROOT_LOG.log",
             format="%(asctime)s [%(name)s][%(levelname)s] %(message)s",
         )
+
+        # logging.basicConfig(level=logging.DEBUG)
+
         log_root = logging.getLogger()
         log_handler = logging.getLogger("Handler")
         log_dict = logging.getLogger("Local_Dict")
@@ -421,6 +485,8 @@ class TweetStream:
         fh_dict.setFormatter(formatter)
         fh_sql = logging.FileHandler("logs/SQL_LOG.log", mode="w+")
         fh_sql.setFormatter(formatter)
+        # fh_root = logging.FileHandler("logs/ROOT_LOG.log", mode="w+")
+        # fh_root.setFormatter(formatter)
 
         log_handler.addHandler(fh_handler)
         log_handler.addHandler(ch)
@@ -431,15 +497,17 @@ class TweetStream:
         log_sql.addHandler(fh_sql)
         log_sql.addHandler(ch)
 
+        # log_root.addHandler(fh_root)
+        # log_root.addHandler(ch)
+
         return log_root
 
     def cache(self):
         for json_response in self.handler.stream():
             self.database.cache(json_response)
-            if self.database.get_sleep_status():
-                self.database.sleep_status = False
-            if self.SQL_PIPE.get_sleep_status():
-                self.SQL_PIPE.sleep_status = False
+            if not self.events['local_db'].is_set():
+                self.log_root.debug("Waking Local DB")
+                self.events['local_db'].set()
 
     def parse(self):
         self.database.connect_to_queue()
@@ -449,9 +517,16 @@ class TweetStream:
 
     def run(self):
         with ThreadPoolExecutor(4) as executor:
-            executor.submit(self.cache)
-            executor.submit(self.parse)
-            executor.submit(self.offload)
+            cache_future = executor.submit(self.cache)
+            parse_future = executor.submit(self.parse)
+            offload_future = executor.submit(self.offload)
+            self.log_root(threading.excepthook(cache_future))
+            if cache_future:
+                self.log_root(cache_future)
+            if parse_future:
+                self.log_root(parse_future)
+            if offload_future:
+                self.log_root(offload_future)
 
 
 # ! Add Author DB, maps author to tweet items
