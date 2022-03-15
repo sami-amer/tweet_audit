@@ -96,7 +96,10 @@ class Toolkit:
         conn = psycopg2.connect(**self.db_args)
         curr = conn.cursor()
         curr.executemany(
-            psql.SQL("INSERT INTO {} VALUES (%s,%s,%s)").format(psql.Identifier("ID_NAME_MAPPING")), flattened_responses
+            psql.SQL("INSERT INTO {} VALUES (%s,%s,%s)").format(
+                psql.Identifier("ID_NAME_MAPPING")
+            ),
+            flattened_responses,
         )
         conn.commit()
         conn.close()
@@ -129,21 +132,35 @@ class Toolkit:
         users_add = [[user] for user in users]
         with psycopg2.connect(**self.db_args).cursor() as cur:
             cur.execute(
-                psql.SQL("""CREATE TABLE {} (USER_NAME STRING PRIMARY KEY NOT NULL);""").format(
-                    psql.Identifier(table_name)
-                )
+                psql.SQL(
+                    """CREATE TABLE {} (USER_NAME STRING PRIMARY KEY NOT NULL);"""
+                ).format(psql.Identifier(table_name))
             )
             # cur.execute(psql.SQL("INSERT INTO {} VALUES (%s)").format(psql.Identifier(table_name)), (10,))
-            cur.executemany(psql.SQL("INSERT INTO {} VALUES (%s);").format(psql.Identifier(table_name)), users_add)
+            cur.executemany(
+                psql.SQL("INSERT INTO {} VALUES (%s);").format(
+                    psql.Identifier(table_name)
+                ),
+                users_add,
+            )
 
     def update_user_group_db(self, users, table_name):
         with psycopg2.connect(**self.db_args).cursor as cur:
-            names = cur.execute(psql.SQL("SELECT USER_NAME FROM {};").format(psql.Identifier(table_name)))
+            names = cur.execute(
+                psql.SQL("SELECT USER_NAME FROM {};").format(
+                    psql.Identifier(table_name)
+                )
+            )
             names = [name[0] for name in names]
         names_set = set(names)
         users_add = [[name] for name in users if name not in names_set]
         with psycopg2.connect(**self.db_args).cursor() as cur:
-            cur.executemany(psql.SQL("INSERT INTO {} VALUES (?);").format(psql.Identifier(table_name)), users_add)
+            cur.executemany(
+                psql.SQL("INSERT INTO {} VALUES (?);").format(
+                    psql.Identifier(table_name)
+                ),
+                users_add,
+            )
 
     def get_user_id(self, user: str) -> dict:
         """
@@ -220,26 +237,36 @@ class Toolkit:
         with psycopg2.connect(**self.db_args) as conn:
             cur = conn.cursor()
             try:
-                cur.execute(psql.SQL("""CREATE TABLE {} (
+                cur.execute(
+                    psql.SQL(
+                        """CREATE TABLE {} (
                     USER_ID BIGINT PRIMARY KEY NOT NULL,
                     USER_NAME TEXT NOT NULL,
-                    USER_FULL_NAME TEXT);""").format( psql.Identifier("ID_NAME_MAPPING")))
+                    USER_FULL_NAME TEXT);"""
+                    ).format(psql.Identifier("ID_NAME_MAPPING"))
+                )
             except psycopg2.errors.DuplicateTable:
                 self.logger.warning("DUPLICATE TABLE, ID_NAME_MAPPING EXISTS")
             try:
-                cur.execute(psql.SQL("""CREATE TABLE {} (
+                cur.execute(
+                    psql.SQL(
+                        """CREATE TABLE {} (
                     TWEET_ID BIGINT PRIMARY KEY NOT NULL,
                     AUTHOR_ID BIGINT NOT NULL,
                     AUTHOR_NAME TEXT NOT NULL,
-                    TWEET_TEXT TEXT NOT NULL);""").format( psql.Identifier("TWEETS")))
+                    TWEET_TEXT TEXT NOT NULL);"""
+                    ).format(psql.Identifier("TWEETS"))
+                )
             except psycopg2.errors.DuplicateTable:
                 self.logger.warning("DUPLICATE TABLE, TWEETS EXISTS")
             conn.commit()
-            
-            cur.execute("INSERT INTO TWEETS VALUES (%s,%s,%s,%s);",(1,1,"testName","testText"))
+
+            cur.execute(
+                "INSERT INTO TWEETS VALUES (%s,%s,%s,%s);",
+                (1, 1, "testName", "testText"),
+            )
             conn.commit()
 
-    
     def test_connection(self):
         with psycopg2.connect(**self.db_args) as conn:
             cur = conn.cursor()
@@ -266,7 +293,7 @@ if __name__ == "__main__":
     # usernames = df["username"].to_list()
     usernames = ["nytimes", "KyivIndependent", "RT_com", "RT_America"]
     bearer_token = os.environ.get("BEARER_TOKEN")
-    db_args = {"host":"localhost","database":"template1", "user":"postgres"}
+    db_args = {"host": "localhost", "database": "template1", "user": "postgres"}
     # kit = Toolkit(bearer_token, "test.db")
     kit = Toolkit(bearer_token, db_args)
     # kit.initialize_db()

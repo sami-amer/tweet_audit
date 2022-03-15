@@ -213,7 +213,7 @@ class Toolkit:
 
     def initialize_db():
         pass
-    
+
     # def add_users(self,user_ids:list[tuple]) -> None:
     #     rules = []
     #     for id,tag in user_ids:
