@@ -1,15 +1,16 @@
 import requests, pickle
 import os
-import logging, sqlite3
+import logging, psycopg2
+import psycopg2.sql as psql
 import pandas as pd
 from classesv1 import TwitterHandler
 
 
 class Toolkit:
-    def __init__(self, bearer_token, db_path):
+    def __init__(self, bearer_token, db_args):
         self.logger = self.create_loggers()
         self.handler = TwitterHandler(bearer_token, self.logger)
-        self.db_path = db_path
+        self.db_args = db_args
 
     def format_rules(self, usernames):
         sorted_users = sorted(usernames, key=len)
@@ -63,7 +64,7 @@ class Toolkit:
     def clean_user_rule(self, user_rule):
         return user_rule.strip()[5:]
 
-    def update_author_to_id(self, db_path):
+    def update_author_to_id(self):
         #! needs revamping to not add duplicates
 
         rules = [x["value"].split("OR") for x in self.handler.get_rules()[0]["rules"]]
@@ -77,11 +78,11 @@ class Toolkit:
         responses = []
         for i in range(0, len(users), 100):
             # get_rule = users[i:i+1].join(",")
-            get_rule = ",".join(users[i : i + 101])
+            get_rule = ",".join(users[i : i + 100])
             get_rules.append(get_rule)
-
+        # print(get_rules)
         for i in get_rules:
-            response = self.handler.get_user_id()
+            response = self.get_user_id(i)
             responses.append(response)
 
         flattened_responses = [
@@ -90,13 +91,15 @@ class Toolkit:
             for item in response["data"]
         ]
 
-        db = sqlite3.connect(db_path)
+        # print(flattened_responses)
 
-        db.executemany(
-            "INSERT INTO ID_NAME_MAPPING VALUES (?,?,?)", flattened_responses
+        conn = psycopg2.connect(**self.db_args)
+        curr = conn.cursor()
+        curr.executemany(
+            psql.SQL("INSERT INTO {} VALUES (%s,%s,%s)").format(psql.Identifier("ID_NAME_MAPPING")), flattened_responses
         )
-        db.commit()
-        db.close()
+        conn.commit()
+        conn.close()
 
     @staticmethod
     def create_loggers() -> logging.Logger:
@@ -124,22 +127,23 @@ class Toolkit:
 
     def add_user_group_db(self, users: list[str], table_name: str) -> None:
         users_add = [[user] for user in users]
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                """CREATE TABLE {} (USER_NAME STRING PRIMARY KEY NOT NULL);""".format(
-                    table_name
+        with psycopg2.connect(**self.db_args).cursor() as cur:
+            cur.execute(
+                psql.SQL("""CREATE TABLE {} (USER_NAME STRING PRIMARY KEY NOT NULL);""").format(
+                    psql.Identifier(table_name)
                 )
             )
-            conn.executemany("INSERT INTO {} VALUES (?);".format(table_name), users_add)
+            # cur.execute(psql.SQL("INSERT INTO {} VALUES (%s)").format(psql.Identifier(table_name)), (10,))
+            cur.executemany(psql.SQL("INSERT INTO {} VALUES (%s);").format(psql.Identifier(table_name)), users_add)
 
     def update_user_group_db(self, users, table_name):
-        with sqlite3.connect(self.db_path) as conn:
-            names = conn.execute("SELECT USER_NAME FROM {};".format(table_name))
+        with psycopg2.connect(**self.db_args).cursor as cur:
+            names = cur.execute(psql.SQL("SELECT USER_NAME FROM {};").format(psql.Identifier(table_name)))
             names = [name[0] for name in names]
         names_set = set(names)
         users_add = [[name] for name in users if name not in names_set]
-        with sqlite3.connect(self.db_path) as conn:
-            conn.executemany("INSERT INTO {} VALUES (?);".format(table_name), users_add)
+        with psycopg2.connect(**self.db_args).cursor() as cur:
+            cur.executemany(psql.SQL("INSERT INTO {} VALUES (?);").format(psql.Identifier(table_name)), users_add)
 
     def get_user_id(self, user: str) -> dict:
         """
@@ -157,17 +161,18 @@ class Toolkit:
         # pinned_tweet_id, profile_image_url, protected,
         # public_metrics, url, username, verified, and withheld
         url = "https://api.twitter.com/2/users/by?{}&{}".format(usernames, user_fields)
-        data = self.handler.get_from_endpoint(url)["data"][0]
-
-        info = {
-            "id": data["id"],
-            "name": data["name"],
-            "username": data["username"],
-            "description": data["description"],
-            "verified": data["verified"],
-            "creation_date": data["created_at"],
-        }
-        return info
+        data = self.handler.get_from_endpoint(url)
+        # data = self.handler.get_from_endpoint(url)["data"][0]
+        # print(data)
+        # info = {
+        #     "id": data["id"],
+        #     "name": data["name"],
+        #     "username": data["username"],
+        #     "description": data["description"],
+        #     "verified": data["verified"],
+        #     "creation_date": data["created_at"],
+        # }
+        return data
 
     def get_user_timeline(self, user_id: str, max_results=5) -> list[dict]:
         """
@@ -211,9 +216,36 @@ class Toolkit:
         self.logger.info(f"User ID Query Returned: {user_id}")
         return user_id
 
-    def initialize_db():
-        pass
+    def initialize_db(self):
+        with psycopg2.connect(**self.db_args) as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute(psql.SQL("""CREATE TABLE {} (
+                    USER_ID BIGINT PRIMARY KEY NOT NULL,
+                    USER_NAME TEXT NOT NULL,
+                    USER_FULL_NAME TEXT);""").format( psql.Identifier("ID_NAME_MAPPING")))
+            except psycopg2.errors.DuplicateTable:
+                self.logger.warning("DUPLICATE TABLE, ID_NAME_MAPPING EXISTS")
+            try:
+                cur.execute(psql.SQL("""CREATE TABLE {} (
+                    TWEET_ID BIGINT PRIMARY KEY NOT NULL,
+                    AUTHOR_ID BIGINT NOT NULL,
+                    AUTHOR_NAME TEXT NOT NULL,
+                    TWEET_TEXT TEXT NOT NULL);""").format( psql.Identifier("TWEETS")))
+            except psycopg2.errors.DuplicateTable:
+                self.logger.warning("DUPLICATE TABLE, TWEETS EXISTS")
+            conn.commit()
+            
+            cur.execute("INSERT INTO TWEETS VALUES (%s,%s,%s,%s);",(1,1,"testName","testText"))
+            conn.commit()
+
     
+    def test_connection(self):
+        with psycopg2.connect(**self.db_args) as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT TWEET_ID FROM TWEETS WHERE TWEET_ID=1;")
+            conn.commit()
+
     # def add_users(self,user_ids:list[tuple]) -> None:
     #     rules = []
     #     for id,tag in user_ids:
@@ -234,7 +266,11 @@ if __name__ == "__main__":
     # usernames = df["username"].to_list()
     usernames = ["nytimes", "KyivIndependent", "RT_com", "RT_America"]
     bearer_token = os.environ.get("BEARER_TOKEN")
-    kit = Toolkit(bearer_token, "test.db")
+    db_args = {"host":"localhost","database":"template1", "user":"postgres"}
+    # kit = Toolkit(bearer_token, "test.db")
+    kit = Toolkit(bearer_token, db_args)
+    # kit.initialize_db()
+    kit.update_author_to_id()
     # for user in usernames:
     #     print(kit.get_user_id(user))
     # kit.add_user_group_db(usernames, "NEWS_USER_NAMES")

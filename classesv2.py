@@ -445,7 +445,7 @@ class TweetStream:
         # self.events['sql'].set()
         self.handler = TwitterHandler(bearer_token, logging.getLogger("Handler"))
         # self.handler = fakeTwitterHandler(logging.getLogger("Handler"))
-        self.SQL_PIPE = SQLPipe(
+        self.sql_pipe = SQLPipe(
             db_path, self.db_q,self.events, logging.getLogger("SQL_Database")
         ) 
         self.database = TweetDB(
@@ -513,7 +513,7 @@ class TweetStream:
         self.database.connect_to_queue()
 
     def offload(self):
-        self.SQL_PIPE.connect_to_queue()
+        self.sql_pipe.connect_to_queue()
 
     def run(self):
         with ThreadPoolExecutor(4) as executor:
