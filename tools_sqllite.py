@@ -37,8 +37,21 @@ class Toolkit:
         old_rules, response = self.handler.get_rules()
 
         users = self.extract_users_from_rules(old_rules) if old_rules else []
-        print(f"Old Rules: {users}")
+        # print(f"Old Rules: {users}")
+        new_users = [x for x in new_users if x not in users]
         users += new_users
+        rules = self.format_rules(users)
+
+        self.handler.delete_all_rules(response)
+        self.handler.set_rules(rules)
+
+    def remove_users_from_rules(self,users_to_remove):
+        old_rules, response = self.handler.get_rules()
+
+        users = self.extract_users_from_rules(old_rules) if old_rules else []
+        self.logger.info(f"Old Rules: {users}")
+        for user in users_to_remove:
+            users.remove(user)
         rules = self.format_rules(users)
 
         self.handler.delete_all_rules(response)
@@ -64,7 +77,6 @@ class Toolkit:
         return user_rule.strip()[5:]
 
     def update_author_to_id(self, db_path):
-        #! needs revamping to not add duplicates
 
         rules = [x["value"].split("OR") for x in self.handler.get_rules()[0]["rules"]]
         # --- from https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
@@ -75,13 +87,26 @@ class Toolkit:
         # ! add a check here for number of users
         get_rules = []
         responses = []
+        with sqlite3.connect(self.db_path) as conn:
+            current_names = conn.execute(
+                ("SELECT USER_NAME FROM ID_NAME_MAPPING;"))
+            current_names = [name[0] for name in current_names] if current_names else None
+        self.logger.info("Got names from DB")
+        
+        names_set = set(current_names) if current_names else set()
+        users_add = [name for name in users if name not in names_set]
+        if not users_add:
+            self.logger.info("No new users to add to mapping, skipping...")
+            return 
+
         for i in range(0, len(users), 100):
             # get_rule = users[i:i+1].join(",")
+            
             get_rule = ",".join(users[i : i + 101])
             get_rules.append(get_rule)
 
         for i in get_rules:
-            response = self.handler.get_user_id()
+            response = self.get_user_id()
             responses.append(response)
 
         flattened_responses = [
@@ -122,7 +147,7 @@ class Toolkit:
         log_tools.addHandler(ch)
         return log_tools
 
-    def add_user_group_db(self, users: list[str], table_name: str) -> None:
+    def create_user_group_db(self, users: list[str], table_name: str) -> None:
         users_add = [[user] for user in users]
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
@@ -131,7 +156,15 @@ class Toolkit:
                 )
             )
             conn.executemany("INSERT INTO {} VALUES (?);".format(table_name), users_add)
-
+            conn.executemany(
+                ("INSERT INTO {} VALUES (?);").format(
+                    (table_name)
+                ),
+                users_add,
+            )
+            conn.commit()
+            conn.close()
+    
     def update_user_group_db(self, users, table_name):
         with sqlite3.connect(self.db_path) as conn:
             names = conn.execute("SELECT USER_NAME FROM {};".format(table_name))
@@ -141,6 +174,13 @@ class Toolkit:
         with sqlite3.connect(self.db_path) as conn:
             conn.executemany("INSERT INTO {} VALUES (?);".format(table_name), users_add)
 
+    
+    def get_user_list(self,table_name):
+        with sqlite3.connect(self.db_path) as conn:
+            output = conn.execute(("SELECT user_name FROM {};").format((table_name)))
+        conn.close()
+        return output
+    
     def get_user_id(self, user: str) -> dict:
         """
         Given a twitter username without "@", returns the user id
@@ -211,9 +251,37 @@ class Toolkit:
         self.logger.info(f"User ID Query Returned: {user_id}")
         return user_id
 
-    def initialize_db():
-        pass
+    def initialize_db(self):
+        with sqlite3.connect(self.db_path) as conn:
+            try:
+                conn.execute(
+                    """CREATE TABLE ID_NAME_MAPPING (
+                        USER_ID BIGINT PRIMARY KEY NOT NULL,
+                        USER_NAME TEXT NOT NULL,
+                        USER_FULL_NAME TEXT);"""
+                )
+            except sqlite3.Error as err:
+                self.logger.warning("DUPLICATE TABLE, ID_NAME_MAPPING EXISTS")
+                self.logger.error(err)
+            try:
+                conn.execute(
+                    (
+                        """CREATE TABLE TWEETS (
+                    TWEET_ID BIGINT PRIMARY KEY NOT NULL,
+                    AUTHOR_ID BIGINT NOT NULL,
+                    AUTHOR_NAME TEXT NOT NULL,
+                    TWEET_TEXT TEXT NOT NULL);"""
+                    ))
+            except sqlite3.Error as err:
+                self.logger.warning("DUPLICATE TABLE, TWEETS EXISTS")
+                self.logger.error(err)
+            conn.commit()
 
+            conn.execute(
+                "INSERT INTO TWEETS VALUES (?,?,?,?)",(1,1,"testName","testText")
+            )
+            conn.commit()
+            
     # def add_users(self,user_ids:list[tuple]) -> None:
     #     rules = []
     #     for id,tag in user_ids:

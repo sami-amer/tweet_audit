@@ -99,6 +99,7 @@ class Toolkit:
             )
             current_names=cur.fetchall()
             current_names = [name[0] for name in current_names] if current_names else None
+            conn.close()
         self.logger.info("Got names from DB")
         names_set = set(current_names) if current_names else set()
         users_add = [name for name in users if name not in names_set]
@@ -175,6 +176,7 @@ class Toolkit:
                 users_add,
             )
             conn.commit()
+            conn.close()
 
     def update_user_group_db(self, users, table_name):
         with psycopg2.connect(**self.db_args) as conn:
@@ -305,7 +307,7 @@ class Toolkit:
             conn.commit()
 
             cur.execute(
-                "INSERT INTO TWEETS VALUES (%s,%s,%s,%s);",
+                psql.SQL("INSERT INTO {} VALUES (%s,%s,%s,%s);").format(psql.Identifier("TWEETS")),
                 (1, 1, "testName", "testText"),
             )
             conn.commit()
@@ -353,6 +355,7 @@ if __name__ == "__main__":
     # kit.update_author_to_id()
     #! WRAP THESE INTO ONE FUNC ^
     #! ADD UPDATE OR DELETE FUNCTION FOR DB
+    #! IMPLEMENT NEW CHANGES FOR SQLLITE
     
     # print(kit.handler.get_rules())
 

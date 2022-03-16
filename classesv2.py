@@ -321,12 +321,17 @@ class PostgresPipe:
         user_mapping = {}
         with psycopg2.connect(**self.db_args) as conn:
             cur = conn.cursor()
-            user_data = cur.execute(psql.SQL("SELECT USER_ID,USER_NAME FROM {};").format(psql.Identifier("ID_NAME_MAPPING")))
+            try:
+                cur.execute(psql.SQL("SELECT USER_ID,USER_NAME FROM {};").format(psql.Identifier("ID_NAME_MAPPING")))
+            except Exception as err:
+                self.logger.error(f"ERROR DOWNLOADING USER MAPPING {err}")
+            user_data = cur.fetchall()
             if user_data == None:
                 self.logger.warning("ID_NAME_MAPPING Empty. Is this expected?")
                 return
             for data in user_data:
                 user_mapping[data[0]] = data[1]
+        self.logger.info("User Mapping Downloaded Successfully!")
         return user_mapping
 
 
@@ -348,14 +353,13 @@ class PostgresPipe:
             cur = conn.cursor()
             try:
                 cur.execute(
-                    psql.SQL("""INSERT INTO {} (TWEET_ID,AUTHOR_ID,AUTHOR_NAME,TWEET_TEXT) VALUES (?,?,?,?)""").format(psql.Identifier("TWEETS")),
+                    psql.SQL("""INSERT INTO {} (TWEET_ID,AUTHOR_ID,AUTHOR_NAME,TWEET_TEXT) VALUES (%s,%s,%s,%s)""").format(psql.Identifier("TWEETS")),
                     insert_values,
                 )
                 conn.commit()
                 self.logger.info("Change Commited")
-            except sqlite3.Error as err:
-                self.logger.error("Failure to add data")
-                self.logger.error(err)
+            except psycopg2.Error as err:
+                self.logger.error(f"Failure to add data {err}")
                 # conn.commit()
             
 
@@ -363,7 +367,7 @@ class PostgresPipe:
     def connect_to_queue(self):
         self.logger.debug(f"SQL Thread Unlocked:{self.events['sql'].is_set()}")
         self.events["sql"].wait()
-        self.logger.debug("Got to connect_to_queue function SQL")
+        self.logger.info("Connecting to SQL Queue")
         while self.db_q:
             try:
                 sql_values = self.db_q.get(timeout=10)
@@ -447,7 +451,7 @@ class TweetDB:
     def parse(self, tweet_data: dict) -> None:
         tweet_id = tweet_data["data"]["id"]
         self.logger.info(f"Parsing Tweet {tweet_id}")
-        tweet_text = tweet_data["data"]["text"]
+        tweet_text = tweet_data["data"]["text"].replace("\n",'')
         self.logger.debug(f"Tweet Text: {tweet_text}")
         tweet_author = tweet_data["data"]["author_id"]
         self.logger.debug(f"Tweet Author: {tweet_author}")
@@ -596,13 +600,13 @@ class TweetStream:
             cache_future = executor.submit(self.cache)
             parse_future = executor.submit(self.parse)
             offload_future = executor.submit(self.offload)
-            self.log_root(threading.excepthook(cache_future))
-            if cache_future:
-                self.log_root(cache_future)
-            if parse_future:
-                self.log_root(parse_future)
-            if offload_future:
-                self.log_root(offload_future)
+            # self.log_root(threading.excepthook(cache_future))
+            # if cache_future:
+            #     self.log_root(cache_future)
+            # if parse_future:
+            #     self.log_root(parse_future)
+            # if offload_future:
+            #     self.log_root(offload_future)
 
 
 # ! Add Author DB, maps author to tweet items
