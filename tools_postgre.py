@@ -1,3 +1,4 @@
+
 import requests, pickle
 import os
 import logging, psycopg2
@@ -33,13 +34,26 @@ class Toolkit:
             )
         return rules
 
-    def update_user_rules(self, new_users):
+    def update_user_rules(self, new_users: list):
         #! add automatic id - username mapping update
         old_rules, response = self.handler.get_rules()
 
         users = self.extract_users_from_rules(old_rules) if old_rules else []
-        print(f"Old Rules: {users}")
+        # print(f"Old Rules: {users}")
+        new_users = [x for x in new_users if x not in users]
         users += new_users
+        rules = self.format_rules(users)
+
+        self.handler.delete_all_rules(response)
+        self.handler.set_rules(rules)
+
+    def remove_users_from_rules(self,users_to_remove):
+        old_rules, response = self.handler.get_rules()
+
+        users = self.extract_users_from_rules(old_rules) if old_rules else []
+        self.logger.info(f"Old Rules: {users}")
+        for user in users_to_remove:
+            users.remove(user)
         rules = self.format_rules(users)
 
         self.handler.delete_all_rules(response)
@@ -65,7 +79,6 @@ class Toolkit:
         return user_rule.strip()[5:]
 
     def update_author_to_id(self):
-        #! needs revamping to not add duplicates
 
         rules = [x["value"].split("OR") for x in self.handler.get_rules()[0]["rules"]]
         # --- from https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
@@ -76,11 +89,30 @@ class Toolkit:
         # ! add a check here for number of users
         get_rules = []
         responses = []
-        for i in range(0, len(users), 100):
-            # get_rule = users[i:i+1].join(",")
-            get_rule = ",".join(users[i : i + 100])
+
+        with psycopg2.connect(**self.db_args) as conn:
+            cur = conn.cursor()
+            current_names = cur.execute(
+                psql.SQL("SELECT USER_NAME FROM {};").format(
+                    psql.Identifier("ID_NAME_MAPPING")
+                )
+            )
+            current_names=cur.fetchall()
+            current_names = [name[0] for name in current_names] if current_names else None
+        self.logger.info("Got names from DB")
+        names_set = set(current_names) if current_names else set()
+        users_add = [name for name in users if name not in names_set]
+        if not users_add:
+            self.logger.info("No new users to add to mapping, skipping...")
+            return 
+        for i in range(0, len(users_add), 100):
+            # get_rule = users_add[i:i+1].join(",")
+
+            get_rule = ",".join(users_add[i : i + 100])
             get_rules.append(get_rule)
-        # print(get_rules)
+        
+        # self.logger.info("Got rules from endpoint")
+
         for i in get_rules:
             response = self.get_user_id(i)
             responses.append(response)
@@ -90,8 +122,6 @@ class Toolkit:
             for response in responses
             for item in response["data"]
         ]
-
-        # print(flattened_responses)
 
         conn = psycopg2.connect(**self.db_args)
         curr = conn.cursor()
@@ -128,12 +158,13 @@ class Toolkit:
         log_tools.addHandler(ch)
         return log_tools
 
-    def add_user_group_db(self, users: list[str], table_name: str) -> None:
+    def create_user_group_db(self, users: list[str], table_name: str) -> None:
         users_add = [[user] for user in users]
-        with psycopg2.connect(**self.db_args).cursor() as cur:
+        with psycopg2.connect(**self.db_args) as conn:
+            cur = conn.cursor()
             cur.execute(
                 psql.SQL(
-                    """CREATE TABLE {} (USER_NAME STRING PRIMARY KEY NOT NULL);"""
+                    """CREATE TABLE {} (user_name TEXT PRIMARY KEY NOT NULL);"""
                 ).format(psql.Identifier(table_name))
             )
             # cur.execute(psql.SQL("INSERT INTO {} VALUES (%s)").format(psql.Identifier(table_name)), (10,))
@@ -143,24 +174,36 @@ class Toolkit:
                 ),
                 users_add,
             )
+            conn.commit()
 
     def update_user_group_db(self, users, table_name):
-        with psycopg2.connect(**self.db_args).cursor as cur:
+        with psycopg2.connect(**self.db_args) as conn:
+            cur = conn.cursor()
             names = cur.execute(
-                psql.SQL("SELECT USER_NAME FROM {};").format(
+                psql.SQL("SELECT user_name FROM {};").format(
                     psql.Identifier(table_name)
                 )
             )
-            names = [name[0] for name in names]
+            names = cur.fetchall()
         names_set = set(names)
         users_add = [[name] for name in users if name not in names_set]
-        with psycopg2.connect(**self.db_args).cursor() as cur:
+        with psycopg2.connect(**self.db_args) as conn:
+            cur = conn.cursor()
             cur.executemany(
-                psql.SQL("INSERT INTO {} VALUES (?);").format(
+                psql.SQL("INSERT INTO {} VALUES (%s);").format(
                     psql.Identifier(table_name)
                 ),
                 users_add,
             )
+
+
+    def get_user_list(self,table_name):
+        with psycopg2.connect(**self.db_args) as conn:
+            cur = conn.cursor()
+            cur.execute(psql.SQL("SELECT user_name FROM {};").format(psql.Identifier(table_name)))
+            output = cur.fetchall()
+        conn.close()
+        return output
 
     def get_user_id(self, user: str) -> dict:
         """
@@ -270,7 +313,7 @@ class Toolkit:
     def test_connection(self):
         with psycopg2.connect(**self.db_args) as conn:
             cur = conn.cursor()
-            cur.execute("SELECT TWEET_ID FROM TWEETS WHERE TWEET_ID=1;")
+            cur.execute(psql.SQL("SELECT TWEET_ID FROM {} WHERE TWEET_ID=1;").format(psql.Identifier("TWEETS")))
             conn.commit()
 
     # def add_users(self,user_ids:list[tuple]) -> None:
@@ -289,15 +332,34 @@ if __name__ == "__main__":
     # rules = pickle.load(f)
     # json.dump(rules,f)
     # rules = json.load(f)
-    df = pd.read_csv("_data/senate_usernames_dec21.csv")
-    # usernames = df["username"].to_list()
-    usernames = ["nytimes", "KyivIndependent", "RT_com", "RT_America"]
+    
+    # df = pd.read_csv("_data/senate_usernames_dec21.csv")
+    # senators = df["username"].to_list()
+
+    american_news = ["AP","WhiteHouse","FoxNews","CNN","potus","msnbc"]
+    
     bearer_token = os.environ.get("BEARER_TOKEN")
     db_args = {"host": "localhost", "database": "template1", "user": "postgres"}
+    
     # kit = Toolkit(bearer_token, "test.db")
     kit = Toolkit(bearer_token, db_args)
+    
     # kit.initialize_db()
-    kit.update_author_to_id()
+    # kit.update_author_to_id()
+    # kit.create_user_group_db(senators,"us_senators")
+
+    # kit.update_user_rules(american_news)
+    # kit.update_user_group_db(american_news,"american_news")
+    # kit.update_author_to_id()
+    #! WRAP THESE INTO ONE FUNC ^
+    #! ADD UPDATE OR DELETE FUNCTION FOR DB
+    
+    # print(kit.handler.get_rules())
+
+    # kit.remove_users_from_rules(["senatemajldr"])
+    # ! ADD CONNECTION CLOSES OR TRY EXCEPT FINALYS FOR CONNECTIONS
+    # kit.update_author_to_id()
+    # kit.update_user_rules
     # for user in usernames:
     #     print(kit.get_user_id(user))
     # kit.add_user_group_db(usernames, "NEWS_USER_NAMES")

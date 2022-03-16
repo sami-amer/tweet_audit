@@ -2,69 +2,12 @@ from dataclasses import dataclass
 from http.client import responses
 from pyclbr import Function
 from queue import Queue
-import queue, requests, os, json, logging, time, pickle, sqlite3, warnings
+import queue, requests, os, json, logging, time, pickle, sqlite3, warnings,psycopg2
+import psycopg2.sql as psql
 import threading
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
-
-
-class fakeTwitterHandler:
-    def __init__(self, logger) -> None:
-        self.logger = logger
-        self.responses = [
-            {
-                "data": {
-                    "author_id": "247334603",
-                    "id": "1501685993916841991",
-                    "text": "As we develop climate policy, we must recognize the disproportionate impact natural disasters &amp; inaccessible resources have on women. This week, I joined @maziehirono to intro the Women &amp; Climate Change Act to ensure the US advances equitable climate solutions that work for all. https://t.co/nbWQJXPBo3",
-                },
-                "includes": {
-                    "users": [
-                        {
-                            "id": "247334603",
-                            "name": "Senator Dick Durbin",
-                            "username": "SenatorDurbin",
-                        },
-                        {
-                            "id": "92186819",
-                            "name": "Senator Mazie Hirono",
-                            "username": "maziehirono",
-                        },
-                    ]
-                },
-                "matching_rules": [{"id": "1500677568919392257", "tag": "501"}],
-            },
-            {
-                "data": {
-                    "author_id": "1099199839",
-                    "id": "1501685742355066892",
-                    "text": "RT @uspirg: Did you know that gas stoves can emit air pollutants in your home at levels exceeding EPA regulations for outdoor air quality?…",
-                },
-                "includes": {
-                    "users": [
-                        {
-                            "id": "1099199839",
-                            "name": "Martin Heinrich",
-                            "username": "MartinHeinrich",
-                        },
-                        {"id": "42660729", "name": "U.S. PIRG", "username": "uspirg"},
-                    ]
-                },
-                "matching_rules": [{"id": "1500677568919392261", "tag": "505"}],
-            },
-        ]
-
-    def stream(self):
-        # for response_line in self.responses:
-        #     time.sleep(10)
-        #     # if response_line:
-        #     #     json_response = json.loads(response_line)
-        #     self.logger.info("output fake json")
-        #     yield response_line
-        while True:
-            time.sleep(10)
-            yield self.responses[0]
 
 
 class TwitterHandler:
@@ -224,18 +167,6 @@ class TwitterHandler:
                 yield json_response
         self.logger.error("STREAM BROKEN!")
 
-    # def get_user_from_tweet(self,id: str):
-    #     tweet_fields = "tweet.fields=lang,author_id"
-    #     # ids = "ids=1278747501642657792,1255542774432063488"
-    #     id = f"ids={id}"
-    #     url = "https://api.twitter.com/2/tweets?{}&{}".format(id, tweet_fields) # ? Maybe use [text] response to double checK?
-
-    #     data = self.handler.get_from_endpoint(url)
-    #     user_id = data["data"][0]["author_id"]
-
-    #     # print(json.dumps(data, indent=4, sort_keys=True))
-    #     self.logger.info(f"User ID Query Returned: {user_id}")
-    #     return user_id
 
 
 @dataclass
@@ -267,7 +198,7 @@ class Tweet:
         }
 
 
-class SQLPipe:
+class SQLlitePipe:
     def __init__(self, db_path, db_q, events: dict, logger: logging.Logger):
         self.db_path = db_path
         self.db_q = db_q
@@ -299,6 +230,14 @@ class SQLPipe:
         return the_real_decorator
 
     # ---
+
+    def download_user_mapping(self):
+        user_mapping = {}
+        with sqlite3.connect(self.db_path) as conn:
+            user_data = conn.execute("SELECT USER_ID,USER_NAME FROM ID_NAME_MAPPING;")
+            for data in user_data:
+                user_mapping[data[0]] = data[1]
+        return user_mapping
 
     def get_sleep_status(self):
         return self.sleep_status
@@ -345,6 +284,98 @@ class SQLPipe:
 
                 # raise queue.Empty
 
+class PostgresPipe:
+    def __init__(self, db_args, db_q, events: dict, logger: logging.Logger):
+        self.db_args = db_args
+        self.db_q = db_q
+        self.events = events
+        self.logger = logger
+        self.sleep_status = True
+
+    # --- adapted from realpython.org
+    # --- https://realpython.com/python-sleep/
+    def sleep_db(timeout, retry=3):
+        def the_real_decorator(function):
+            def wrapper(self, *args, **kwargs):
+                retries = 0
+                while retries < retry:
+                    try:
+                        value = function(self, *args, **kwargs)
+                        if value is None:
+                            return
+                    except:
+                        self.logger.info(f"Sleeping SQL for {timeout} seconds")
+                        time.sleep(timeout)
+                        retries += 1
+                self.logger.info("Sleeping SQL DB")
+                self.events["sql"].clear()
+                self.wait_to_wake()
+
+            return wrapper
+
+        return the_real_decorator
+
+    # ---
+
+    def download_user_mapping(self):
+        user_mapping = {}
+        with psycopg2.connect(**self.db_args) as conn:
+            cur = conn.cursor()
+            user_data = cur.execute(psql.SQL("SELECT USER_ID,USER_NAME FROM {};").format(psql.Identifier("ID_NAME_MAPPING")))
+            if user_data == None:
+                self.logger.warning("ID_NAME_MAPPING Empty. Is this expected?")
+                return
+            for data in user_data:
+                user_mapping[data[0]] = data[1]
+        return user_mapping
+
+
+    def get_sleep_status(self):
+        return self.sleep_status
+
+    def wait_to_wake(self):
+        # while self.sleep_status:
+        #     time.sleep(60)
+        #     self.logger.info("Checking for Queue status")
+        #     self.logger.info(f"Queue is empty: {self.db_q.empty()}")
+        self.logger.info("Waiting...")
+        self.events["sql"].wait()
+        self.connect_to_queue()
+
+    def execute_SQL(self, insert_values):
+        self.logger.info("Executing SQL Commands")
+        with psycopg2.connect(**self.db_args) as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    psql.SQL("""INSERT INTO {} (TWEET_ID,AUTHOR_ID,AUTHOR_NAME,TWEET_TEXT) VALUES (?,?,?,?)""").format(psql.Identifier("TWEETS")),
+                    insert_values,
+                )
+                conn.commit()
+                self.logger.info("Change Commited")
+            except sqlite3.Error as err:
+                self.logger.error("Failure to add data")
+                self.logger.error(err)
+                # conn.commit()
+            
+
+    # @sleep_db(timeout=10)
+    def connect_to_queue(self):
+        self.logger.debug(f"SQL Thread Unlocked:{self.events['sql'].is_set()}")
+        self.events["sql"].wait()
+        self.logger.debug("Got to connect_to_queue function SQL")
+        while self.db_q:
+            try:
+                sql_values = self.db_q.get(timeout=10)
+                self.logger.debug(f"parsing values: {sql_values}")
+                self.execute_SQL(sql_values)
+            except queue.Empty:
+                self.logger.info("Queue is empty, sleeping")
+                self.logger.info("Sleeping SQL DB")
+                self.events["sql"].clear()
+                self.wait_to_wake()
+
+                # raise queue.Empty
 
 class TweetDB:
     """
@@ -475,11 +506,7 @@ class TweetDB:
 class TweetStream:
     def __init__(self, bearer_token: str, db_path: str):
         self.log_root = self.create_loggers()
-        self.user_mapping = {}
-        with sqlite3.connect(db_path) as conn:
-            user_data = conn.execute("SELECT USER_ID,USER_NAME FROM ID_NAME_MAPPING;")
-            for data in user_data:
-                self.user_mapping[data[0]] = data[1]
+        
         # self.log_root.info(self.user_mapping)
         self.tweet_dict = {}
         self.tweet_q = Queue(0)
@@ -490,9 +517,13 @@ class TweetStream:
         # self.events['sql'].set()
         self.handler = TwitterHandler(bearer_token, logging.getLogger("Handler"))
         # self.handler = fakeTwitterHandler(logging.getLogger("Handler"))
-        self.sql_pipe = SQLPipe(
+        # self.sql_pipe = SQLlitePipe(
+        #     db_path, self.db_q, self.events, logging.getLogger("SQL_Database")
+        # )
+        self.sql_pipe = PostgresPipe(
             db_path, self.db_q, self.events, logging.getLogger("SQL_Database")
         )
+        self.user_mapping = self.sql_pipe.download_user_mapping()
         self.database = TweetDB(
             self.tweet_dict,
             self.tweet_q,
@@ -578,5 +609,7 @@ class TweetStream:
 
 if __name__ == "__main__":
     bearer_token = os.environ.get("BEARER_TOKEN")
-    stream = TweetStream(bearer_token, "test.db")
+    # stream = TweetStream(bearer_token, "test.db")
+    postgres_args =  {"host": "localhost", "database": "template1", "user": "postgres"}
+    stream = TweetStream(bearer_token, postgres_args)
     stream.run()

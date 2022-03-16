@@ -26,9 +26,9 @@ class Toolkit:
         curr_rule = curr_rule[:-4]
         rules.append(curr_rule)
         rules = [{"value": x, "tag": str(len(x))} for x in rules]
-        if len(rules) > 5:
+        if len(rules) > 25:
             self.logger.error(
-                "RULES ARE GREATER THAN 5! THIS IS NOT ALLOWED WITH ESSENTIAL ACCESS!"
+                "RULES ARE GREATER THAN 25! THIS IS NOT ALLOWED WITH ELEVATED ACCESS!"
             )
         return rules
 

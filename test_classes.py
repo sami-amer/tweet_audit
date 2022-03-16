@@ -19,6 +19,62 @@ log_tester.addHandler(ch)
 # export 'BEARER_TOKEN'='<your_bearer_token>'
 bearer_token = os.environ.get("BEARER_TOKEN")
 
+class fakeTwitterHandler:
+    def __init__(self, logger) -> None:
+        self.logger = logger
+        self.responses = [
+            {
+                "data": {
+                    "author_id": "247334603",
+                    "id": "1501685993916841991",
+                    "text": "As we develop climate policy, we must recognize the disproportionate impact natural disasters &amp; inaccessible resources have on women. This week, I joined @maziehirono to intro the Women &amp; Climate Change Act to ensure the US advances equitable climate solutions that work for all. https://t.co/nbWQJXPBo3",
+                },
+                "includes": {
+                    "users": [
+                        {
+                            "id": "247334603",
+                            "name": "Senator Dick Durbin",
+                            "username": "SenatorDurbin",
+                        },
+                        {
+                            "id": "92186819",
+                            "name": "Senator Mazie Hirono",
+                            "username": "maziehirono",
+                        },
+                    ]
+                },
+                "matching_rules": [{"id": "1500677568919392257", "tag": "501"}],
+            },
+            {
+                "data": {
+                    "author_id": "1099199839",
+                    "id": "1501685742355066892",
+                    "text": "RT @uspirg: Did you know that gas stoves can emit air pollutants in your home at levels exceeding EPA regulations for outdoor air quality?…",
+                },
+                "includes": {
+                    "users": [
+                        {
+                            "id": "1099199839",
+                            "name": "Martin Heinrich",
+                            "username": "MartinHeinrich",
+                        },
+                        {"id": "42660729", "name": "U.S. PIRG", "username": "uspirg"},
+                    ]
+                },
+                "matching_rules": [{"id": "1500677568919392261", "tag": "505"}],
+            },
+        ]
+
+    def stream(self):
+        # for response_line in self.responses:
+        #     time.sleep(10)
+        #     # if response_line:
+        #     #     json_response = json.loads(response_line)
+        #     self.logger.info("output fake json")
+        #     yield response_line
+        while True:
+            time.sleep(10)
+            yield self.responses[0]
 
 class TestHandlerMock:
     def fake_get_from_endpoint_success(self, url):
