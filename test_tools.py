@@ -119,14 +119,21 @@ def fake_clean_user_rule(user_rule):
 def fake_format_rules(rules):
     return ToolkitPostgre.format_rules(None, rules)
 
+def fake_get_user_id(i):
+    splits = i.split(",")
+    user_ids = [s[-1] for s in splits]
+    user_names = [s[:-1] for s in splits]
+    full_names = ["Mr."+s[:-1] for s in splits]
+    dicts = [{"id":x[0],"username":x[1],"name":x[2]} for x in zip(user_ids,user_names,full_names)]
+    return {"data":dicts}
 
 def test_init(postgresql):
-
     connection = postgresql
+    cur = connection.cursor()
+
     fake_self = FakeObject()
     fake_self.connection = connection
     ToolkitPostgre.initialize_db(fake_self)
-    cur = connection.cursor()
     cur.execute(
         psql.SQL("SELECT tweet_id FROM {} WHERE tweet_id=1;").format(
             psql.Identifier("tweets")
@@ -135,6 +142,78 @@ def test_init(postgresql):
 
     assert 1 == cur.fetchone()[0]
 
+
+def test_update_author_id(postgresql):
+    connection = postgresql
+    cur = connection.cursor()
+    
+    fake_self = FakeObject()
+    fake_self.connection = connection
+    fake_self.handler = fakeTwitterHandler
+    fake_self.logger = log_tester
+    fake_self.clean_user_rule = fake_clean_user_rule
+    fake_self.get_user_id = fake_get_user_id
+
+
+
+    ToolkitPostgre.initialize_db(fake_self)
+    ToolkitPostgre.update_author_to_id(fake_self)
+    cur.execute(psql.SQL("SELECT user_id FROM {};").format(psql.Identifier("id_name_mapping")))
+    output = [x[0] for x in cur.fetchall()]
+
+    assert output == [1,2,3,4,5]
+
+def test_create_user_group_db(postgresql):
+    connection = postgresql
+    cur = connection.cursor()
+    
+    fake_self = FakeObject()
+    fake_self.connection = connection
+    fake_self.handler = fakeTwitterHandler
+
+    users = ["sami","wami","bami"]
+    table_name = "nicknames"
+    ToolkitPostgre.create_user_group_db(fake_self,users,table_name)
+
+    cur.execute(psql.SQL("SELECT user_name FROM {};").format(psql.Identifier(table_name)))
+    output = [x[0] for x in cur.fetchall()]
+
+    assert output == users
+
+def test_update_user_group_db(postgresql):
+    connection = postgresql
+    cur = connection.cursor()
+    
+    fake_self = FakeObject()
+    fake_self.connection = connection
+    fake_self.handler = fakeTwitterHandler
+
+    users = ["sami","wami","bami"]
+    to_add = ["samasimi"]
+    table_name = "nicknames"
+    ToolkitPostgre.create_user_group_db(fake_self,users,table_name)
+    ToolkitPostgre.update_user_group_db(fake_self,to_add,table_name)
+
+    cur.execute(psql.SQL("SELECT user_name FROM {};").format(psql.Identifier(table_name)))
+    output = [x[0] for x in cur.fetchall()]
+
+    assert output == ["sami","wami","bami","samasimi"]
+
+def test_get_user_list(postgresql):
+    connection = postgresql
+    cur = connection.cursor()
+    
+    fake_self = FakeObject()
+    fake_self.connection = connection
+    fake_self.handler = fakeTwitterHandler
+
+    users = ["sami","wami","bami"]
+    table_name = "nicknames"
+    ToolkitPostgre.create_user_group_db(fake_self,users,table_name)
+
+    output = [x[0] for x in ToolkitPostgre.get_user_list(fake_self,table_name)]
+
+    assert output == users
 
 def test_format_rules():
     fake_self = FakeObject()
@@ -187,6 +266,20 @@ def test_remove_users_from_rules():
 
     output = ToolkitPostgre.remove_users_from_rules(fake_self, users_to_remove)
     assert output == [{"tag": "38", "value": "from:test3 OR from:test4 OR from:test5"}]
+
+
+def test_update_user_rules():
+    fake_self = FakeObject()
+    fake_self.handler = fakeTwitterHandler
+    fake_self.extract_users_from_rules = fake_extract_users_from_old_rules
+    fake_self.logger = log_tester
+    fake_self.format_rules = fake_format_rules
+
+    users_to_add = ["test1", "test2"]
+
+    output = ToolkitPostgre.update_user_rules(fake_self, users_to_add)
+    assert output == [{'value': 'from:test1 OR from:test2 OR from:test3 OR from:test4 OR from:test5', 'tag': '66'}]
+
 
 
 if __name__ == "__main__":

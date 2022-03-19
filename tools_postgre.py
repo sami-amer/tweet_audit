@@ -105,6 +105,7 @@ class Toolkit:
 
         self.handler.delete_all_rules(response)
         self.handler.set_rules(rules)
+        return rules # only for testing purposes
 
     def set_user_rules(self, users):
         #! add automatic id - username mapping update
@@ -121,23 +122,24 @@ class Toolkit:
         flattened_rules = [item for rule in rules for item in rule]
         # ----
         users = [self.clean_user_rule(rule) for rule in flattened_rules]
-        print(f"Number of users is: {len(users)}")
+        self.logger.info(f"Number of users is: {len(users)}")
         # ! add a check here for number of users
         get_rules = []
         responses = []
 
-        with self.connection as conn:
-            cur = conn.cursor()
-            current_names = cur.execute(
-                psql.SQL("SELECT USER_NAME FROM {};").format(
-                    psql.Identifier("ID_NAME_MAPPING")
-                )
+
+        conn = self.connection
+        cur = conn.cursor()
+        current_names = cur.execute(
+            psql.SQL("SELECT USER_NAME FROM {};").format(
+                psql.Identifier("id_name_mapping")
             )
-            current_names = cur.fetchall()
-            current_names = (
-                [name[0] for name in current_names] if current_names else None
-            )
-            conn.close()
+        )
+        current_names = cur.fetchall()
+        current_names = (
+            [name[0] for name in current_names] if current_names else None
+        )
+
         self.logger.info("Got names from DB")
         names_set = set(current_names) if current_names else set()
         users_add = [name for name in users if name not in names_set]
@@ -166,63 +168,63 @@ class Toolkit:
         curr = conn.cursor()
         curr.executemany(
             psql.SQL("INSERT INTO {} VALUES (%s,%s,%s)").format(
-                psql.Identifier("ID_NAME_MAPPING")
+                psql.Identifier("id_name_mapping")
             ),
             flattened_responses,
         )
         conn.commit()
-        conn.close()
+
 
     def create_user_group_db(self, users: list[str], table_name: str) -> None:
         users_add = [[user] for user in users]
-        with self.connection as conn:
-            cur = conn.cursor()
-            cur.execute(
-                psql.SQL(
-                    """CREATE TABLE {} (user_name TEXT PRIMARY KEY NOT NULL);"""
-                ).format(psql.Identifier(table_name))
-            )
-            # cur.execute(psql.SQL("INSERT INTO {} VALUES (%s)").format(psql.Identifier(table_name)), (10,))
-            cur.executemany(
-                psql.SQL("INSERT INTO {} VALUES (%s);").format(
-                    psql.Identifier(table_name)
-                ),
-                users_add,
-            )
-            conn.commit()
-            conn.close()
+        conn = self.connection
+        cur = conn.cursor()
+        cur.execute(
+            psql.SQL(
+                """CREATE TABLE {} (user_name TEXT PRIMARY KEY NOT NULL);"""
+            ).format(psql.Identifier(table_name))
+        )
+        # cur.execute(psql.SQL("INSERT INTO {} VALUES (%s)").format(psql.Identifier(table_name)), (10,))
+        cur.executemany(
+            psql.SQL("INSERT INTO {} VALUES (%s);").format(
+                psql.Identifier(table_name)
+            ),
+            users_add,
+        )
+        conn.commit()
+
 
     def update_user_group_db(self, users, table_name):
-        with self.connection as conn:
-            cur = conn.cursor()
-            names = cur.execute(
-                psql.SQL("SELECT user_name FROM {};").format(
-                    psql.Identifier(table_name)
-                )
+        
+        conn = self.connection
+        cur = conn.cursor()
+        names = cur.execute(
+            psql.SQL("SELECT user_name FROM {};").format(
+                psql.Identifier(table_name)
             )
-            names = cur.fetchall()
+        )
+        names = cur.fetchall()
         names_set = set(names)
         users_add = [[name] for name in users if name not in names_set]
-        with self.connection as conn:
-            cur = conn.cursor()
-            cur.executemany(
-                psql.SQL("INSERT INTO {} VALUES (%s);").format(
-                    psql.Identifier(table_name)
-                ),
-                users_add,
-            )
+            
+        cur.executemany(
+            psql.SQL("INSERT INTO {} VALUES (%s);").format(
+                psql.Identifier(table_name)
+            ),
+            users_add,
+        )
 
     def get_user_list(self, table_name):
-        with self.connection as conn:
-            cur = conn.cursor()
-            cur.execute(
-                psql.SQL("SELECT user_name FROM {};").format(
-                    psql.Identifier(table_name)
-                )
+
+        conn = self.connection
+        cur = conn.cursor()
+        cur.execute(
+            psql.SQL("SELECT user_name FROM {};").format(
+                psql.Identifier(table_name)
             )
-            output = cur.fetchall()
-        conn.close()
-        return output
+        )
+        output = cur.fetchall()
+        return output #! Do I want this to output solo tuples? Fix tests if not the case
 
     def get_user_id(self, user: str) -> dict:
         """
@@ -333,23 +335,15 @@ class Toolkit:
         conn.commit()
 
     def test_connection(self):
-        with self.connection as conn:
-            cur = conn.cursor()
-            cur.execute(
-                psql.SQL("SELECT tweet_id FROM {} WHERE tweet_id=1;").format(
-                    psql.Identifier("tweets")
-                )
+        conn = self.connection
+        cur = conn.cursor()
+        cur.execute(
+            psql.SQL("SELECT tweet_id FROM {} WHERE tweet_id=1;").format(
+                psql.Identifier("tweets")
             )
-            conn.commit()
+        )
+        conn.commit()
 
-    # def add_users(self,user_ids:list[tuple]) -> None:
-    #     rules = []
-    #     for id,tag in user_ids:
-    #         rules.append({"value": f"from:{id}", "tag": f"{tag}"})
-
-    #     for rule in rules:
-    #         self.logger.info(f"Adding Rule: {rule}")
-    #     self.handler.set_rules(rules)
 
 
 if __name__ == "__main__":
