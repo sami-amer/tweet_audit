@@ -1,10 +1,11 @@
 
 import requests, pickle
 import os
-import logging, psycopg2
-import psycopg2.sql as psql
+import logging, psycopg
+import psycopg.sql as psql
 import pandas as pd
 from classesv1 import TwitterHandler
+
 
 
 class Toolkit:
@@ -12,6 +13,42 @@ class Toolkit:
         self.logger = self.create_loggers()
         self.handler = TwitterHandler(bearer_token, self.logger)
         self.db_args = db_args
+
+        try:
+            self.connection = psycopg.connect(**self.db_args)
+            self.logger.info("Postgres Connection Established!")
+        except Exception as err:
+            self.connection = None
+            self.logger.error("POSTGRES CONNECTION BROKEN")
+            self.logger.error(db_args)
+            self.logger.error(f"{err}")
+
+    @staticmethod
+    def create_loggers() -> logging.Logger:
+        formatter = logging.Formatter(
+            "%(asctime)s [%(name)s][%(levelname)s] %(message)s"
+        )
+        logging.basicConfig(
+            level=logging.DEBUG,
+            filename="logs/ROOT_LOG.log",
+            format="%(asctime)s [%(name)s][%(levelname)s] %(message)s",
+        )
+
+        log_tools = logging.getLogger("Tools")
+
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        ch.setFormatter(formatter)
+
+        fh_tools = logging.FileHandler("logs/TOOLS_LOG.log")
+        fh_tools.setFormatter(formatter)
+
+        log_tools.addHandler(fh_tools)
+        log_tools.addHandler(ch)
+        return log_tools
+
+    def tearDown(self):
+        self.connection.close()
 
     def format_rules(self, usernames):
         sorted_users = sorted(usernames, key=len)
@@ -34,6 +71,30 @@ class Toolkit:
             )
         return rules
 
+    def clean_user_rule(self, user_rule):
+        return user_rule.strip()[5:]
+    
+    def extract_users_from_rules(self, rules):
+        rules = [x["value"].split("OR") for x in rules["rules"]]
+        # --- from https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
+        flattened_rules = [item for rule in rules for item in rule]
+        # ----
+        users = [self.clean_user_rule(rule) for rule in flattened_rules]
+        return users
+
+    def remove_users_from_rules(self,users_to_remove):
+        old_rules, response = self.handler.get_rules()
+
+        users = self.extract_users_from_rules(old_rules) if old_rules else []
+        self.logger.info(f"Old Rules: {users}")
+        for user in users_to_remove:
+            users.remove(user)
+        rules = self.format_rules(users)
+
+        self.handler.delete_all_rules(response)
+        self.handler.set_rules(rules)
+        return rules # only for testing purposes
+
     def update_user_rules(self, new_users: list):
         #! add automatic id - username mapping update
         old_rules, response = self.handler.get_rules()
@@ -47,18 +108,6 @@ class Toolkit:
         self.handler.delete_all_rules(response)
         self.handler.set_rules(rules)
 
-    def remove_users_from_rules(self,users_to_remove):
-        old_rules, response = self.handler.get_rules()
-
-        users = self.extract_users_from_rules(old_rules) if old_rules else []
-        self.logger.info(f"Old Rules: {users}")
-        for user in users_to_remove:
-            users.remove(user)
-        rules = self.format_rules(users)
-
-        self.handler.delete_all_rules(response)
-        self.handler.set_rules(rules)
-
     def set_user_rules(self, users):
         #! add automatic id - username mapping update
         old_rules, response = self.handler.get_rules()
@@ -67,16 +116,6 @@ class Toolkit:
         self.handler.delete_all_rules(response)
         self.handler.set_rules(rules)
 
-    def extract_users_from_rules(self, rules):
-        rules = [x["value"].split("OR") for x in rules["rules"]]
-        # --- from https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
-        flattened_rules = [item for rule in rules for item in rule]
-        # ----
-        users = [self.clean_user_rule(rule) for rule in flattened_rules]
-        return users
-
-    def clean_user_rule(self, user_rule):
-        return user_rule.strip()[5:]
 
     def update_author_to_id(self):
 
@@ -90,7 +129,7 @@ class Toolkit:
         get_rules = []
         responses = []
 
-        with psycopg2.connect(**self.db_args) as conn:
+        with self.connection as conn:
             cur = conn.cursor()
             current_names = cur.execute(
                 psql.SQL("SELECT USER_NAME FROM {};").format(
@@ -124,7 +163,7 @@ class Toolkit:
             for item in response["data"]
         ]
 
-        conn = psycopg2.connect(**self.db_args)
+        conn = self.connection
         curr = conn.cursor()
         curr.executemany(
             psql.SQL("INSERT INTO {} VALUES (%s,%s,%s)").format(
@@ -135,33 +174,11 @@ class Toolkit:
         conn.commit()
         conn.close()
 
-    @staticmethod
-    def create_loggers() -> logging.Logger:
-        formatter = logging.Formatter(
-            "%(asctime)s [%(name)s][%(levelname)s] %(message)s"
-        )
-        logging.basicConfig(
-            level=logging.DEBUG,
-            filename="logs/ROOT_LOG.log",
-            format="%(asctime)s [%(name)s][%(levelname)s] %(message)s",
-        )
 
-        log_tools = logging.getLogger("Tools")
-
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
-        ch.setFormatter(formatter)
-
-        fh_tools = logging.FileHandler("logs/TOOLS_LOG.log")
-        fh_tools.setFormatter(formatter)
-
-        log_tools.addHandler(fh_tools)
-        log_tools.addHandler(ch)
-        return log_tools
 
     def create_user_group_db(self, users: list[str], table_name: str) -> None:
         users_add = [[user] for user in users]
-        with psycopg2.connect(**self.db_args) as conn:
+        with self.connection as conn:
             cur = conn.cursor()
             cur.execute(
                 psql.SQL(
@@ -179,7 +196,7 @@ class Toolkit:
             conn.close()
 
     def update_user_group_db(self, users, table_name):
-        with psycopg2.connect(**self.db_args) as conn:
+        with self.connection as conn:
             cur = conn.cursor()
             names = cur.execute(
                 psql.SQL("SELECT user_name FROM {};").format(
@@ -189,7 +206,7 @@ class Toolkit:
             names = cur.fetchall()
         names_set = set(names)
         users_add = [[name] for name in users if name not in names_set]
-        with psycopg2.connect(**self.db_args) as conn:
+        with self.connection as conn:
             cur = conn.cursor()
             cur.executemany(
                 psql.SQL("INSERT INTO {} VALUES (%s);").format(
@@ -200,7 +217,7 @@ class Toolkit:
 
 
     def get_user_list(self,table_name):
-        with psycopg2.connect(**self.db_args) as conn:
+        with self.connection as conn:
             cur = conn.cursor()
             cur.execute(psql.SQL("SELECT user_name FROM {};").format(psql.Identifier(table_name)))
             output = cur.fetchall()
@@ -279,43 +296,44 @@ class Toolkit:
         return user_id
 
     def initialize_db(self):
-        with psycopg2.connect(**self.db_args) as conn:
-            cur = conn.cursor()
-            try:
-                cur.execute(
-                    psql.SQL(
-                        """CREATE TABLE {} (
-                    USER_ID BIGINT PRIMARY KEY NOT NULL,
-                    USER_NAME TEXT NOT NULL,
-                    USER_FULL_NAME TEXT);"""
-                    ).format(psql.Identifier("ID_NAME_MAPPING"))
-                )
-            except psycopg2.errors.DuplicateTable:
-                self.logger.warning("DUPLICATE TABLE, ID_NAME_MAPPING EXISTS")
-            try:
-                cur.execute(
-                    psql.SQL(
-                        """CREATE TABLE {} (
-                    TWEET_ID BIGINT PRIMARY KEY NOT NULL,
-                    AUTHOR_ID BIGINT NOT NULL,
-                    AUTHOR_NAME TEXT NOT NULL,
-                    TWEET_TEXT TEXT NOT NULL);"""
-                    ).format(psql.Identifier("TWEETS"))
-                )
-            except psycopg2.errors.DuplicateTable:
-                self.logger.warning("DUPLICATE TABLE, TWEETS EXISTS")
-            conn.commit()
-
+        # with self.connection as conn:
+        conn = self.connection
+        cur = conn.cursor()
+        try:
             cur.execute(
-                psql.SQL("INSERT INTO {} VALUES (%s,%s,%s,%s);").format(psql.Identifier("TWEETS")),
-                (1, 1, "testName", "testText"),
+                psql.SQL(
+                    """CREATE TABLE {} (
+                user_id BIGINT PRIMARY KEY NOT NULL,
+                user_name TEXT NOT NULL,
+                user_full_name TEXT);"""
+                ).format(psql.Identifier("id_name_mapping"))
             )
-            conn.commit()
+        except psycopg.errors.DuplicateTable:
+            self.logger.warning("DUPLICATE TABLE, id_name_mapping EXISTS")
+        try:
+            cur.execute(
+                psql.SQL(
+                    """CREATE TABLE {} (
+                tweet_id BIGINT PRIMARY KEY NOT NULL,
+                author_id BIGINT NOT NULL,
+                author_name TEXT NOT NULL,
+                tweet_text TEXT NOT NULL);"""
+                ).format(psql.Identifier("tweets"))
+            )
+        except psycopg.errors.DuplicateTable:
+            self.logger.warning("DUPLICATE TABLE, tweets EXISTS")
+        conn.commit()
+
+        cur.execute(
+            psql.SQL("INSERT INTO {} VALUES (%s,%s,%s,%s);").format(psql.Identifier("tweets")),
+            (1, 1, "testName", "testText"),
+        )
+        conn.commit()
 
     def test_connection(self):
-        with psycopg2.connect(**self.db_args) as conn:
+        with self.connection as conn:
             cur = conn.cursor()
-            cur.execute(psql.SQL("SELECT TWEET_ID FROM {} WHERE TWEET_ID=1;").format(psql.Identifier("TWEETS")))
+            cur.execute(psql.SQL("SELECT tweet_id FROM {} WHERE tweet_id=1;").format(psql.Identifier("tweets")))
             conn.commit()
 
     # def add_users(self,user_ids:list[tuple]) -> None:
@@ -341,10 +359,11 @@ if __name__ == "__main__":
     american_news = ["AP","WhiteHouse","FoxNews","CNN","potus","msnbc"]
     
     bearer_token = os.environ.get("BEARER_TOKEN")
-    db_args = {"host": "localhost", "database": "template1", "user": "postgres"}
+    db_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
     
     # kit = Toolkit(bearer_token, "test.db")
     kit = Toolkit(bearer_token, db_args)
+    print(kit.connection)
     
     # kit.initialize_db()
     # kit.update_author_to_id()

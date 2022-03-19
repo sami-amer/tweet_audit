@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from http.client import responses
 from pyclbr import Function
 from queue import Queue
-import queue, requests, os, json, logging, time, pickle, sqlite3, warnings,psycopg2
-import psycopg2.sql as psql
+import queue, requests, os, json, logging, time, pickle, sqlite3, warnings,psycopg
+import psycopg.sql as psql
 import threading
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
@@ -287,6 +287,7 @@ class SQLlitePipe:
 class PostgresPipe:
     def __init__(self, db_args, db_q, events: dict, logger: logging.Logger):
         self.db_args = db_args
+        self.connection = psycopg.connect(**self.db_args)
         self.db_q = db_q
         self.events = events
         self.logger = logger
@@ -319,7 +320,7 @@ class PostgresPipe:
 
     def download_user_mapping(self):
         user_mapping = {}
-        with psycopg2.connect(**self.db_args) as conn:
+        with self.connection as conn:
             cur = conn.cursor()
             try:
                 cur.execute(psql.SQL("SELECT USER_ID,USER_NAME FROM {};").format(psql.Identifier("ID_NAME_MAPPING")))
@@ -349,7 +350,7 @@ class PostgresPipe:
 
     def execute_SQL(self, insert_values):
         self.logger.info("Executing SQL Commands")
-        with psycopg2.connect(**self.db_args) as conn:
+        with self.connection as conn:
             cur = conn.cursor()
             try:
                 cur.execute(
@@ -358,7 +359,7 @@ class PostgresPipe:
                 )
                 conn.commit()
                 self.logger.info("Change Commited")
-            except psycopg2.Error as err:
+            except psycopg.Error as err:
                 self.logger.error(f"Failure to add data {err}")
                 # conn.commit()
             
@@ -614,6 +615,6 @@ class TweetStream:
 if __name__ == "__main__":
     bearer_token = os.environ.get("BEARER_TOKEN")
     # stream = TweetStream(bearer_token, "test.db")
-    postgres_args =  {"host": "localhost", "database": "template1", "user": "postgres"}
+    postgres_args =  {"host": "localhost", "dbname": "template1", "user": "postgres"}
     stream = TweetStream(bearer_token, postgres_args)
     stream.run()
