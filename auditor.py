@@ -7,8 +7,8 @@ To set your enviornment variables in your terminal run the following line:
 export 'BEARER_TOKEN'='<your_bearer_token>'
 """
 
-import logging, os
-from classesv2 import TweetStream
+import os
+from classes.classesv2 import TweetStream
 
 
 if __name__ == "__main__":

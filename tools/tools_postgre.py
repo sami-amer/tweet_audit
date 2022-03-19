@@ -3,7 +3,7 @@ import os
 import logging, psycopg
 import psycopg.sql as psql
 import pandas as pd
-from classesv1 import TwitterHandler
+from classes.classesv1 import TwitterHandler
 
 
 class Toolkit:

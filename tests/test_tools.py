@@ -1,13 +1,9 @@
-from importlib.resources import path
 from sqlite3 import connect
-from urllib import response
-import warnings
-from classesv1 import TweetStream, Tweet, TweetDB, TwitterHandler
 from unittest.mock import Mock, patch
 from pytest_postgresql import factories
 import psycopg.sql as psql
 import pytest, os, logging, time, psycopg
-from tools_postgre import Toolkit as ToolkitPostgre
+from tools.tools_postgre import Toolkit as ToolkitPostgre
 
 
 formatter = logging.Formatter("%(asctime)s [%(name)s][%(levelname)s] %(message)s")

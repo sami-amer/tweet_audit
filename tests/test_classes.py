@@ -1,7 +1,7 @@
 from urllib import response
 import warnings
 import pytest, os, logging, time
-from classesv1 import TweetStream, Tweet, TweetDB, TwitterHandler
+from classes.classesv1 import TweetStream, Tweet, TweetDB, TwitterHandler
 from unittest.mock import Mock, patch
 
 formatter = logging.Formatter("%(asctime)s [%(name)s][%(levelname)s] %(message)s")
