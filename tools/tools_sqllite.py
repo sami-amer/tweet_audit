@@ -1,7 +1,12 @@
-import requests, pickle
+# native
+import logging
 import os
-import logging, sqlite3
+import sqlite3
+
+# packages
 import pandas as pd
+
+# lib
 from classes.classesv1 import TwitterHandler
 
 

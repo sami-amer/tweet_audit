@@ -1,8 +1,12 @@
-import requests, pickle
+# native
+import logging
 import os
-import logging, psycopg
+
+# packages
+import psycopg
 import psycopg.sql as psql
-import pandas as pd
+
+# lib
 from classes.classesv1 import TwitterHandler
 
 

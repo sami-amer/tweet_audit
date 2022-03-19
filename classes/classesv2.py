@@ -1,13 +1,22 @@
+# native
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from http.client import responses
-from pyclbr import Function
+import json
+import logging
+import os
+import pickle
+import queue
 from queue import Queue
-import queue, requests, os, json, logging, time, pickle, sqlite3, warnings, psycopg
-import psycopg.sql as psql
-import threading
-import pandas as pd
-from concurrent.futures import ThreadPoolExecutor
+import requests
+import sqlite3
 from threading import Event
+import time
+import warnings
+
+# packages
+import psycopg
+import psycopg.sql as psql
 
 
 class TwitterHandler:

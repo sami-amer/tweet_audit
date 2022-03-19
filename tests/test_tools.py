@@ -1,8 +1,13 @@
-from sqlite3 import connect
-from unittest.mock import Mock, patch
-from pytest_postgresql import factories
+# native
+import logging
+import time
+from unittest.mock import patch
+
+# packages
 import psycopg.sql as psql
-import pytest, os, logging, time, psycopg
+from pytest_postgresql import factories
+
+# lib
 from tools.tools_postgre import Toolkit as ToolkitPostgre
 
 

@@ -1,9 +1,18 @@
-from dataclasses import dataclass
-from pyclbr import Function
-from queue import Queue
-import queue, requests, os, json, logging, time, pickle, sqlite3, warnings
-import pandas as pd
+# native
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+import logging
+import os
+import pickle
+from queue import Queue
+import queue
+import requests
+import sqlite3
+import json
+import warnings
+
+# packages
+import pandas as pd
 
 
 class TwitterHandler:

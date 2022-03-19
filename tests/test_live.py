@@ -1,8 +1,14 @@
-from urllib import response
-import warnings
-import pytest, os, logging
-from classes.classesv1 import TweetStream, Tweet, TweetDB, TwitterHandler
-from unittest.mock import Mock, patch
+# native
+import logging
+import os
+from unittest.mock import patch
+
+# packages
+import pytest
+
+# lib
+from classes.classesv1 import TwitterHandler
+
 
 formatter = logging.Formatter("%(asctime)s [%(name)s][%(levelname)s] %(message)s")
 log_tester = logging.getLogger("Tester")
