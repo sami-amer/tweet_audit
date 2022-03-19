@@ -45,7 +45,7 @@ class Toolkit:
         self.handler.delete_all_rules(response)
         self.handler.set_rules(rules)
 
-    def remove_users_from_rules(self,users_to_remove):
+    def remove_users_from_rules(self, users_to_remove):
         old_rules, response = self.handler.get_rules()
 
         users = self.extract_users_from_rules(old_rules) if old_rules else []
@@ -88,20 +88,21 @@ class Toolkit:
         get_rules = []
         responses = []
         with sqlite3.connect(self.db_path) as conn:
-            current_names = conn.execute(
-                ("SELECT USER_NAME FROM ID_NAME_MAPPING;"))
-            current_names = [name[0] for name in current_names] if current_names else None
+            current_names = conn.execute(("SELECT USER_NAME FROM ID_NAME_MAPPING;"))
+            current_names = (
+                [name[0] for name in current_names] if current_names else None
+            )
         self.logger.info("Got names from DB")
-        
+
         names_set = set(current_names) if current_names else set()
         users_add = [name for name in users if name not in names_set]
         if not users_add:
             self.logger.info("No new users to add to mapping, skipping...")
-            return 
+            return
 
         for i in range(0, len(users), 100):
             # get_rule = users[i:i+1].join(",")
-            
+
             get_rule = ",".join(users[i : i + 101])
             get_rules.append(get_rule)
 
@@ -157,14 +158,12 @@ class Toolkit:
             )
             conn.executemany("INSERT INTO {} VALUES (?);".format(table_name), users_add)
             conn.executemany(
-                ("INSERT INTO {} VALUES (?);").format(
-                    (table_name)
-                ),
+                ("INSERT INTO {} VALUES (?);").format((table_name)),
                 users_add,
             )
             conn.commit()
             conn.close()
-    
+
     def update_user_group_db(self, users, table_name):
         with sqlite3.connect(self.db_path) as conn:
             names = conn.execute("SELECT USER_NAME FROM {};".format(table_name))
@@ -174,13 +173,12 @@ class Toolkit:
         with sqlite3.connect(self.db_path) as conn:
             conn.executemany("INSERT INTO {} VALUES (?);".format(table_name), users_add)
 
-    
-    def get_user_list(self,table_name):
+    def get_user_list(self, table_name):
         with sqlite3.connect(self.db_path) as conn:
             output = conn.execute(("SELECT user_name FROM {};").format((table_name)))
         conn.close()
         return output
-    
+
     def get_user_id(self, user: str) -> dict:
         """
         Given a twitter username without "@", returns the user id
@@ -271,17 +269,18 @@ class Toolkit:
                     AUTHOR_ID BIGINT NOT NULL,
                     AUTHOR_NAME TEXT NOT NULL,
                     TWEET_TEXT TEXT NOT NULL);"""
-                    ))
+                    )
+                )
             except sqlite3.Error as err:
                 self.logger.warning("DUPLICATE TABLE, TWEETS EXISTS")
                 self.logger.error(err)
             conn.commit()
 
             conn.execute(
-                "INSERT INTO TWEETS VALUES (?,?,?,?)",(1,1,"testName","testText")
+                "INSERT INTO TWEETS VALUES (?,?,?,?)", (1, 1, "testName", "testText")
             )
             conn.commit()
-            
+
     # def add_users(self,user_ids:list[tuple]) -> None:
     #     rules = []
     #     for id,tag in user_ids:

@@ -4,9 +4,9 @@ from urllib import response
 import warnings
 from classesv1 import TweetStream, Tweet, TweetDB, TwitterHandler
 from unittest.mock import Mock, patch
-from  pytest_postgresql import factories
+from pytest_postgresql import factories
 import psycopg.sql as psql
-import pytest, os, logging,time,psycopg
+import pytest, os, logging, time, psycopg
 from tools_postgre import Toolkit as ToolkitPostgre
 
 
@@ -21,8 +21,8 @@ fh_tester.setFormatter(formatter)
 log_tester.addHandler(fh_tester)
 log_tester.addHandler(ch)
 
+
 class fakeTwitterHandler:
-    
     def __init__(self, logger) -> None:
         self.logger = logger
         self.responses = [
@@ -80,33 +80,45 @@ class fakeTwitterHandler:
             yield self.responses[0]
 
     def get_rules():
-        return {"rules":[{"value":"from:test1 OR from:test2 OR from:test3"},{"value":"from:test4 OR from:test5"}]}, None
+        return {
+            "rules": [
+                {"value": "from:test1 OR from:test2 OR from:test3"},
+                {"value": "from:test4 OR from:test5"},
+            ]
+        }, None
 
     def delete_all_rules(rules):
         return rules
-    
+
     def set_rules(rules):
         return rules
+
+
 postgresql_my_proc = factories.postgresql_proc()
-postgresql = factories.postgresql('postgresql_my_proc')
+postgresql = factories.postgresql("postgresql_my_proc")
+
 
 class FakeObject(object):
     pass
 
+
 def fake_extract_users_from_old_rules(rules):
-        rules = [x["value"].split("OR") for x in rules["rules"]]
-        # --- from https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
-        flattened_rules = [item for rule in rules for item in rule]
-        # ----
-        users = [fake_clean_user_rule(rule) for rule in flattened_rules]
-        return users
+    rules = [x["value"].split("OR") for x in rules["rules"]]
+    # --- from https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
+    flattened_rules = [item for rule in rules for item in rule]
+    # ----
+    users = [fake_clean_user_rule(rule) for rule in flattened_rules]
+    return users
+
 
 def fake_clean_user_rule(user_rule):
     return user_rule.strip()[5:]
     # return ToolkitPostgre.clean_user_rule(None,user_rule)
 
+
 def fake_format_rules(rules):
-    return ToolkitPostgre.format_rules(None,rules)
+    return ToolkitPostgre.format_rules(None, rules)
+
 
 def test_init(postgresql):
 
@@ -115,61 +127,69 @@ def test_init(postgresql):
     fake_self.connection = connection
     ToolkitPostgre.initialize_db(fake_self)
     cur = connection.cursor()
-    cur.execute(psql.SQL("SELECT tweet_id FROM {} WHERE tweet_id=1;").format(psql.Identifier("tweets")))
-    
+    cur.execute(
+        psql.SQL("SELECT tweet_id FROM {} WHERE tweet_id=1;").format(
+            psql.Identifier("tweets")
+        )
+    )
+
     assert 1 == cur.fetchone()[0]
+
 
 def test_format_rules():
     fake_self = FakeObject()
     fake_self.logger = log_tester
-    names = ["testerPerson"]*50
-    formatted_rules = ToolkitPostgre.format_rules(fake_self,names)
+    names = ["testerPerson"] * 50
+    formatted_rules = ToolkitPostgre.format_rules(fake_self, names)
 
-    str1 = "from:testerPerson OR "*24
-    str2 = "from:testerPerson OR "*24
+    str1 = "from:testerPerson OR " * 24
+    str2 = "from:testerPerson OR " * 24
+
+    assert formatted_rules[0] == {
+        "tag": str(len(str1[:-4])),
+        "value": str1[:-4],
+    } and formatted_rules[1] == {"tag": str(len(str2[:-4])), "value": str2[:-4]}
 
 
-    assert formatted_rules[0] == {'tag':str(len(str1[:-4])),'value': str1[:-4]} and formatted_rules[1] == {'tag':str(len(str2[:-4])),'value': str2[:-4]}
-        
 def test_clean_user_rule():
     fake_self = FakeObject()
     user_rule = " from:testRule "
-    output = ToolkitPostgre.clean_user_rule(fake_self,user_rule)
-    
+    output = ToolkitPostgre.clean_user_rule(fake_self, user_rule)
+
     assert output == "testRule"
 
 
-@patch.object(ToolkitPostgre,"clean_user_rule",fake_clean_user_rule)
+@patch.object(ToolkitPostgre, "clean_user_rule", fake_clean_user_rule)
 def test_extract_users_from_old_rules():
     fake_self = FakeObject()
     fake_self.clean_user_rule = fake_clean_user_rule
-    rules = {"rules":[{"value":"from:test1 OR from:test2 OR from:test3"},{"value":"from:test4 OR from:test5"}]}
-    output = ToolkitPostgre.extract_users_from_rules(fake_self,rules)
-    assert output == ["test1","test2","test3","test4","test5"]
+    rules = {
+        "rules": [
+            {"value": "from:test1 OR from:test2 OR from:test3"},
+            {"value": "from:test4 OR from:test5"},
+        ]
+    }
+    output = ToolkitPostgre.extract_users_from_rules(fake_self, rules)
+    assert output == ["test1", "test2", "test3", "test4", "test5"]
 
 
-
-
-
-@patch.object(ToolkitPostgre,"clean_user_rule",fake_clean_user_rule)
+@patch.object(ToolkitPostgre, "clean_user_rule", fake_clean_user_rule)
 # @patch.object(ToolkitPostgre,"format_rules",ToolkitPostgre.format_rules)
 def test_remove_users_from_rules():
-    
+
     fake_self = FakeObject()
     fake_self.handler = fakeTwitterHandler
     fake_self.extract_users_from_rules = fake_extract_users_from_old_rules
     fake_self.logger = log_tester
     fake_self.format_rules = fake_format_rules
-    
-    users_to_remove = ["test1","test2"]
-    
-    output = ToolkitPostgre.remove_users_from_rules(fake_self,users_to_remove)
-    assert output == [{'tag': '38', 'value': 'from:test3 OR from:test4 OR from:test5'}]
+
+    users_to_remove = ["test1", "test2"]
+
+    output = ToolkitPostgre.remove_users_from_rules(fake_self, users_to_remove)
+    assert output == [{"tag": "38", "value": "from:test3 OR from:test4 OR from:test5"}]
 
 
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # postgresql = testing.postgresql.Postgresql(port=7654)
     # conn = psycopg2.connect(postgresql.url())
     # cur = conn.cursor()

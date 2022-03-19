@@ -1,11 +1,9 @@
-
 import requests, pickle
 import os
 import logging, psycopg
 import psycopg.sql as psql
 import pandas as pd
 from classesv1 import TwitterHandler
-
 
 
 class Toolkit:
@@ -73,7 +71,7 @@ class Toolkit:
 
     def clean_user_rule(self, user_rule):
         return user_rule.strip()[5:]
-    
+
     def extract_users_from_rules(self, rules):
         rules = [x["value"].split("OR") for x in rules["rules"]]
         # --- from https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
@@ -82,7 +80,7 @@ class Toolkit:
         users = [self.clean_user_rule(rule) for rule in flattened_rules]
         return users
 
-    def remove_users_from_rules(self,users_to_remove):
+    def remove_users_from_rules(self, users_to_remove):
         old_rules, response = self.handler.get_rules()
 
         users = self.extract_users_from_rules(old_rules) if old_rules else []
@@ -93,7 +91,7 @@ class Toolkit:
 
         self.handler.delete_all_rules(response)
         self.handler.set_rules(rules)
-        return rules # only for testing purposes
+        return rules  # only for testing purposes
 
     def update_user_rules(self, new_users: list):
         #! add automatic id - username mapping update
@@ -116,7 +114,6 @@ class Toolkit:
         self.handler.delete_all_rules(response)
         self.handler.set_rules(rules)
 
-
     def update_author_to_id(self):
 
         rules = [x["value"].split("OR") for x in self.handler.get_rules()[0]["rules"]]
@@ -136,21 +133,23 @@ class Toolkit:
                     psql.Identifier("ID_NAME_MAPPING")
                 )
             )
-            current_names=cur.fetchall()
-            current_names = [name[0] for name in current_names] if current_names else None
+            current_names = cur.fetchall()
+            current_names = (
+                [name[0] for name in current_names] if current_names else None
+            )
             conn.close()
         self.logger.info("Got names from DB")
         names_set = set(current_names) if current_names else set()
         users_add = [name for name in users if name not in names_set]
         if not users_add:
             self.logger.info("No new users to add to mapping, skipping...")
-            return 
+            return
         for i in range(0, len(users_add), 100):
             # get_rule = users_add[i:i+1].join(",")
 
             get_rule = ",".join(users_add[i : i + 100])
             get_rules.append(get_rule)
-        
+
         # self.logger.info("Got rules from endpoint")
 
         for i in get_rules:
@@ -173,8 +172,6 @@ class Toolkit:
         )
         conn.commit()
         conn.close()
-
-
 
     def create_user_group_db(self, users: list[str], table_name: str) -> None:
         users_add = [[user] for user in users]
@@ -215,11 +212,14 @@ class Toolkit:
                 users_add,
             )
 
-
-    def get_user_list(self,table_name):
+    def get_user_list(self, table_name):
         with self.connection as conn:
             cur = conn.cursor()
-            cur.execute(psql.SQL("SELECT user_name FROM {};").format(psql.Identifier(table_name)))
+            cur.execute(
+                psql.SQL("SELECT user_name FROM {};").format(
+                    psql.Identifier(table_name)
+                )
+            )
             output = cur.fetchall()
         conn.close()
         return output
@@ -325,7 +325,9 @@ class Toolkit:
         conn.commit()
 
         cur.execute(
-            psql.SQL("INSERT INTO {} VALUES (%s,%s,%s,%s);").format(psql.Identifier("tweets")),
+            psql.SQL("INSERT INTO {} VALUES (%s,%s,%s,%s);").format(
+                psql.Identifier("tweets")
+            ),
             (1, 1, "testName", "testText"),
         )
         conn.commit()
@@ -333,7 +335,11 @@ class Toolkit:
     def test_connection(self):
         with self.connection as conn:
             cur = conn.cursor()
-            cur.execute(psql.SQL("SELECT tweet_id FROM {} WHERE tweet_id=1;").format(psql.Identifier("tweets")))
+            cur.execute(
+                psql.SQL("SELECT tweet_id FROM {} WHERE tweet_id=1;").format(
+                    psql.Identifier("tweets")
+                )
+            )
             conn.commit()
 
     # def add_users(self,user_ids:list[tuple]) -> None:
@@ -352,19 +358,19 @@ if __name__ == "__main__":
     # rules = pickle.load(f)
     # json.dump(rules,f)
     # rules = json.load(f)
-    
+
     # df = pd.read_csv("_data/senate_usernames_dec21.csv")
     # senators = df["username"].to_list()
 
-    american_news = ["AP","WhiteHouse","FoxNews","CNN","potus","msnbc"]
-    
+    american_news = ["AP", "WhiteHouse", "FoxNews", "CNN", "potus", "msnbc"]
+
     bearer_token = os.environ.get("BEARER_TOKEN")
     db_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
-    
+
     # kit = Toolkit(bearer_token, "test.db")
     kit = Toolkit(bearer_token, db_args)
     print(kit.connection)
-    
+
     # kit.initialize_db()
     # kit.update_author_to_id()
     # kit.create_user_group_db(senators,"us_senators")
@@ -375,7 +381,7 @@ if __name__ == "__main__":
     #! WRAP THESE INTO ONE FUNC ^
     #! ADD UPDATE OR DELETE FUNCTION FOR DB
     #! IMPLEMENT NEW CHANGES FOR SQLLITE
-    
+
     # print(kit.handler.get_rules())
 
     # kit.remove_users_from_rules(["senatemajldr"])
