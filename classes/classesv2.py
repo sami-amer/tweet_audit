@@ -333,8 +333,8 @@ class PostgresPipe:
             cur = conn.cursor()
             try:
                 cur.execute(
-                    psql.SQL("SELECT USER_ID,USER_NAME FROM {};").format(
-                        psql.Identifier("ID_NAME_MAPPING")
+                    psql.SQL("SELECT user_id,user_name FROM {};").format(
+                        psql.Identifier("id_name_mapping")
                     )
                 )
             except Exception as err:
@@ -370,8 +370,8 @@ class PostgresPipe:
             try:
                 cur.execute(
                     psql.SQL(
-                        """INSERT INTO {} (TWEET_ID,AUTHOR_ID,AUTHOR_NAME,TWEET_TEXT) VALUES (%s,%s,%s,%s)"""
-                    ).format(psql.Identifier("TWEETS")),
+                        """INSERT INTO {} (tweet_id,author_id,author_name,tweet_text) VALUES (%s,%s,%s,%s)"""
+                    ).format(psql.Identifier("tweets")),
                     insert_values,
                 )
                 conn.commit()

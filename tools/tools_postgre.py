@@ -131,29 +131,16 @@ class Toolkit:
         get_rules = []
         responses = []
 
-<<<<<<< HEAD:tools_postgre.py
-        with psycopg2.connect(**self.db_args) as conn:
-            cur = conn.cursor()
-            current_names = cur.execute(
-                psql.SQL("SELECT USER_NAME FROM {};").format(
-                    psql.Identifier("id_name_mapping")
-                )
-            )
-            current_names=cur.fetchall()
-            current_names = [name[0] for name in current_names] if current_names else None
-            # conn.close()
-=======
         conn = self.connection
         cur = conn.cursor()
         current_names = cur.execute(
-            psql.SQL("SELECT USER_NAME FROM {};").format(
+            psql.SQL("SELECT user_name FROM {};").format(
                 psql.Identifier("id_name_mapping")
             )
         )
         current_names = cur.fetchall()
         current_names = [name[0] for name in current_names] if current_names else None
 
->>>>>>> 79f183b95fc54418628baef63c5d30ce51fb5b67:tools/tools_postgre.py
         self.logger.info("Got names from DB")
         names_set = set(current_names) if current_names else set()
         users_add = [name for name in users if name not in names_set]
@@ -187,34 +174,6 @@ class Toolkit:
             flattened_responses,
         )
         conn.commit()
-<<<<<<< HEAD:tools_postgre.py
-        # conn.close()
-
-    @staticmethod
-    def create_loggers() -> logging.Logger:
-        formatter = logging.Formatter(
-            "%(asctime)s [%(name)s][%(levelname)s] %(message)s"
-        )
-        logging.basicConfig(
-            level=logging.DEBUG,
-            filename="logs/ROOT_LOG.log",
-            format="%(asctime)s [%(name)s][%(levelname)s] %(message)s",
-        )
-
-        log_tools = logging.getLogger("Tools")
-
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
-        ch.setFormatter(formatter)
-
-        fh_tools = logging.FileHandler("logs/TOOLS_LOG.log")
-        fh_tools.setFormatter(formatter)
-
-        log_tools.addHandler(fh_tools)
-        log_tools.addHandler(ch)
-        return log_tools
-=======
->>>>>>> 79f183b95fc54418628baef63c5d30ce51fb5b67:tools/tools_postgre.py
 
     def create_user_group_db(self, users: list[str], table_name: str) -> None:
         users_add = [[user] for user in users]
@@ -332,56 +291,6 @@ class Toolkit:
         return user_id
 
     def initialize_db(self):
-<<<<<<< HEAD:tools_postgre.py
-        with psycopg2.connect(**self.db_args) as conn:
-            cur = conn.cursor()
-            try:
-                cur.execute(
-                    psql.SQL(
-                        """CREATE TABLE {} (
-                    USER_ID BIGINT PRIMARY KEY NOT NULL,
-                    USER_NAME TEXT NOT NULL,
-                    USER_FULL_NAME TEXT);"""
-                    ).format(psql.Identifier("id_name_mapping"))
-                )
-                conn.commit()
-            except psycopg2.errors.DuplicateTable:
-                self.logger.warning("DUPLICATE TABLE, id_name_mapping EXISTS")
-                cur.execute("ROLLBACK;")
-                conn.commit()
-            try:
-                cur.execute(
-                    psql.SQL(
-                        """CREATE TABLE {} (
-                    tweet_id BIGINT PRIMARY KEY NOT NULL,
-                    author_id BIGINT NOT NULL,
-                    author_name TEXT NOT NULL,
-                    tweet_text TEXT NOT NULL);"""
-                    ).format(psql.Identifier("tweets"))
-                )
-                conn.commit()
-            except psycopg2.errors.DuplicateTable:
-                self.logger.warning("DUPLICATE TABLE, tweets EXISTS")
-                cur.execute("ROLLBACK;")
-                conn.commit()
-
-            try:
-                cur.execute(
-                psql.SQL("INSERT INTO {} VALUES (%s,%s,%s,%s);").format(psql.Identifier("tweets")),
-                (1, 1, "testName", "testText"),
-            )
-                conn.commit()
-            except psycopg2.errors.UniqueViolation:
-                cur.execute("ROLLBACK;")
-                conn.commit()
-
-    def test_connection(self):
-        with psycopg2.connect(**self.db_args) as conn:
-            cur = conn.cursor()
-            cur.execute(psql.SQL("SELECT tweet_id FROM {} WHERE tweet_id=1;").format(psql.Identifier("tweets")))
-            a = cur.fetch()
-            self.logger.info("Connection Successful!")
-=======
         # with self.connection as conn:
         conn = self.connection
         cur = conn.cursor()
@@ -409,7 +318,6 @@ class Toolkit:
         except psycopg.errors.DuplicateTable:
             self.logger.warning("DUPLICATE TABLE, tweets EXISTS")
         conn.commit()
->>>>>>> 79f183b95fc54418628baef63c5d30ce51fb5b67:tools/tools_postgre.py
 
         cur.execute(
             psql.SQL("INSERT INTO {} VALUES (%s,%s,%s,%s);").format(
@@ -443,21 +351,12 @@ if __name__ == "__main__":
     american_news = ["AP", "WhiteHouse", "FoxNews", "CNN", "potus", "msnbc"]
 
     bearer_token = os.environ.get("BEARER_TOKEN")
-<<<<<<< HEAD:tools_postgre.py
-    db_args = {"host": "localhost", "dbname": "tweet_audit", "user": "sami","password":"admin", "port":"5432"}
-    
-    # kit = Toolkit(bearer_token, "test.db")
-    kit = Toolkit(bearer_token, db_args)
-    kit.test_connection()
-    
-=======
     db_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
 
     # kit = Toolkit(bearer_token, "test.db")
     kit = Toolkit(bearer_token, db_args)
     print(kit.connection)
 
->>>>>>> 79f183b95fc54418628baef63c5d30ce51fb5b67:tools/tools_postgre.py
     # kit.initialize_db()
     # kit.update_author_to_id()
     # kit.create_user_group_db(senators,"us_senators")
