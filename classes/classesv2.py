@@ -27,11 +27,12 @@ class TwitterHandler:
     Python Object to control TwitterAPIv2 stream
     """
 
-    def __init__(self, bearer_token: str, logger: logging.Logger):
+    def __init__(self, bearer_token: str, events:dict[str,Event], logger: logging.Logger):
         # To set your enviornment variables in your terminal run the following line:
         # export 'BEARER_TOKEN'='<your_bearer_token>'
         self.bearer_token = bearer_token
         self.logger = logger
+        self.events = events
 
     def bearer_oauth(self, r):
         """
@@ -177,7 +178,24 @@ class TwitterHandler:
                 json_response = json.loads(response_line)
                 self.logger.debug(f"json respone: {json_response}")
                 yield json_response
-        self.logger.error("STREAM BROKEN!")
+        self.logger.error("STREAM BROKEN! ATTEMPTING TO TERMINATE!")
+        self.kill()
+    
+
+    def kill(self):
+        self.logger.warning("Setting local_db flag")
+        self.events["local_db"].set()
+        self.logger.warning("local_db flag set")
+
+        self.logger.warning("Setting sql flag")
+        self.events["sql"].set()
+        self.logger.warning("sql flag set")
+        
+        self.logger.warning("Setting killall flag")
+        self.events["killall"].set()
+        self.logger.warning("killall flag set")
+        
+                
 
 
 @dataclass
@@ -210,7 +228,7 @@ class Tweet:
 
 
 class SQLlitePipe:
-    def __init__(self, db_path, db_q, events: dict, logger: logging.Logger):
+    def __init__(self, db_path, db_q, events: dict[str,Event], logger: logging.Logger):
         self.db_path = db_path
         self.db_q = db_q
         self.events = events
@@ -260,7 +278,11 @@ class SQLlitePipe:
         #     self.logger.info(f"Queue is empty: {self.db_q.empty()}")
         self.logger.info("Waiting...")
         self.events["sql"].wait()
-        self.connect_to_queue()
+        if self.events["killall"].is_set():
+            self.logger.error("Kill command received while waiting to wake")
+            self.logger.error("No longer attempting to connect to queue (SQLite)!")
+        else:
+            self.connect_to_queue()
 
     def execute_SQL(self, insert_values):
         self.logger.info("Executing SQL Commands")
@@ -297,7 +319,7 @@ class SQLlitePipe:
 
 
 class PostgresPipe:
-    def __init__(self, db_args, db_q, events: dict, logger: logging.Logger):
+    def __init__(self, db_args, db_q, events: dict[str,Event], logger: logging.Logger):
         self.db_args = db_args
         self.connection = psycopg.connect(**self.db_args)
         self.db_q = db_q
@@ -364,7 +386,12 @@ class PostgresPipe:
         #     self.logger.info(f"Queue is empty: {self.db_q.empty()}")
         self.logger.info("Waiting...")
         self.events["sql"].wait()
-        self.connect_to_queue()
+        if self.events["killall"].is_set():
+            self.logger.error("Kill command received while waiting to wake")
+            self.logger.error("No longer attempting to connect to queue (Postgres)!")
+        else:
+            self.connect_to_queue()
+
 
     def execute_SQL(self, insert_values):
         self.logger.info("Executing SQL Commands")
@@ -414,7 +441,7 @@ class TweetDB:
         tweet_dict: dict,
         response_q: Queue,
         db_q: Queue,
-        events: dict[Event],
+        events: dict[str,Event],
         id_mapping: dict,
         logger: logging.Logger,
     ):
@@ -458,7 +485,11 @@ class TweetDB:
         #     self.logger.info(f"Queue is empty: {self.response_q.empty()}")
         self.logger.info("Waiting...")
         self.events["local_db"].wait()
-        self.connect_to_queue()
+        if self.events["killall"].is_set():
+            self.logger.error("Kill command received while waiting to wake")
+            self.logger.error("No longer attempting to connect to queue (local_db)!")
+        else:
+            self.connect_to_queue()
 
     def get_sleep_status(self):
         return self.sleep_status
