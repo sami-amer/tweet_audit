@@ -18,6 +18,9 @@ import warnings
 import psycopg
 import psycopg.sql as psql
 
+# lib
+from . import POSTGRES_ARGS, SQLLITE_ARGS
+
 
 class TwitterHandler:
     """
@@ -534,7 +537,7 @@ class TweetStream:
         self.tweet_q = Queue(0)
         self.db_q = Queue(0)
 
-        self.events = {"local_db": Event(), "sql": Event()}
+        self.events = {"local_db": Event(), "sql": Event(), "killall":Event()}
         # self.events['local_db'].set()
         # self.events['sql'].set()
         self.handler = TwitterHandler(bearer_token, logging.getLogger("Handler"))
@@ -632,6 +635,6 @@ class TweetStream:
 if __name__ == "__main__":
     bearer_token = os.environ.get("BEARER_TOKEN")
     # stream = TweetStream(bearer_token, "test.db")
-    postgres_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
-    stream = TweetStream(bearer_token, postgres_args)
+    # postgres_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
+    stream = TweetStream(bearer_token, POSTGRES_ARGS)
     stream.run()
