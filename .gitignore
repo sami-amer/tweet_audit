@@ -1,5 +1,7 @@
 # Keys and temp files
-_*
+_data
+_keys
+__pycache__
 *.txt
 *.log
 logs/

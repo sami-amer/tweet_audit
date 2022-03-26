@@ -1,8 +1,15 @@
-from urllib import response
-import warnings
-import pytest, os, logging
-from classesv1 import TweetStream, Tweet, TweetDB, TwitterHandler
-from unittest.mock import Mock, patch
+# native
+import logging
+import os
+import time
+from unittest.mock import patch
+
+# packages
+import pytest
+
+# lib
+from classes.classesv1 import Tweet, TwitterHandler
+
 
 formatter = logging.Formatter("%(asctime)s [%(name)s][%(levelname)s] %(message)s")
 log_tester = logging.getLogger("Tester")
@@ -18,6 +25,7 @@ log_tester.addHandler(ch)
 # To set your enviornment variables in your terminal run the following line:
 # export 'BEARER_TOKEN'='<your_bearer_token>'
 bearer_token = os.environ.get("BEARER_TOKEN")
+
 
 class fakeTwitterHandler:
     def __init__(self, logger) -> None:
@@ -75,6 +83,7 @@ class fakeTwitterHandler:
         while True:
             time.sleep(10)
             yield self.responses[0]
+
 
 class TestHandlerMock:
     def fake_get_from_endpoint_success(self, url):

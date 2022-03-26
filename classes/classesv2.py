@@ -1,13 +1,22 @@
+# native
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from http.client import responses
-from pyclbr import Function
+import json
+import logging
+import os
+import pickle
+import queue
 from queue import Queue
-import queue, requests, os, json, logging, time, pickle, sqlite3, warnings,psycopg2
-import psycopg2.sql as psql
-import threading
-import pandas as pd
-from concurrent.futures import ThreadPoolExecutor
+import requests
+import sqlite3
 from threading import Event
+import time
+import warnings
+
+# packages
+import psycopg
+import psycopg.sql as psql
 
 
 class TwitterHandler:
@@ -168,7 +177,6 @@ class TwitterHandler:
         self.logger.error("STREAM BROKEN!")
 
 
-
 @dataclass
 class Tweet:
     """
@@ -284,9 +292,11 @@ class SQLlitePipe:
 
                 # raise queue.Empty
 
+
 class PostgresPipe:
     def __init__(self, db_args, db_q, events: dict, logger: logging.Logger):
         self.db_args = db_args
+        self.connection = psycopg.connect(**self.db_args)
         self.db_q = db_q
         self.events = events
         self.logger = logger
@@ -319,10 +329,14 @@ class PostgresPipe:
 
     def download_user_mapping(self):
         user_mapping = {}
-        with psycopg2.connect(**self.db_args) as conn:
+        with self.connection as conn:
             cur = conn.cursor()
             try:
-                cur.execute(psql.SQL("SELECT user_id,user_name FROM {};").format(psql.Identifier("id_name_mapping")))
+                cur.execute(
+                    psql.SQL("SELECT USER_ID,USER_NAME FROM {};").format(
+                        psql.Identifier("ID_NAME_MAPPING")
+                    )
+                )
             except Exception as err:
                 self.logger.error(f"ERROR DOWNLOADING USER MAPPING {err}")
             try:
@@ -336,7 +350,6 @@ class PostgresPipe:
                 user_mapping[data[0]] = data[1]
         self.logger.info("User Mapping Downloaded Successfully!")
         return user_mapping
-
 
     def get_sleep_status(self):
         return self.sleep_status
@@ -352,19 +365,20 @@ class PostgresPipe:
 
     def execute_SQL(self, insert_values):
         self.logger.info("Executing SQL Commands")
-        with psycopg2.connect(**self.db_args) as conn:
+        with self.connection as conn:
             cur = conn.cursor()
             try:
                 cur.execute(
-                    psql.SQL("""INSERT INTO {} (tweet_id,author_id,author_name,tweet_text) VALUES (%s,%s,%s,%s)""").format(psql.Identifier("tweets")),
+                    psql.SQL(
+                        """INSERT INTO {} (TWEET_ID,AUTHOR_ID,AUTHOR_NAME,TWEET_TEXT) VALUES (%s,%s,%s,%s)"""
+                    ).format(psql.Identifier("TWEETS")),
                     insert_values,
                 )
                 conn.commit()
                 self.logger.info("Change Commited")
-            except psycopg2.Error as err:
+            except psycopg.Error as err:
                 self.logger.error(f"Failure to add data {err}")
                 # conn.commit()
-            
 
     # @sleep_db(timeout=10)
     def connect_to_queue(self):
@@ -383,6 +397,7 @@ class PostgresPipe:
                 self.wait_to_wake()
 
                 # raise queue.Empty
+
 
 class TweetDB:
     """
@@ -454,7 +469,7 @@ class TweetDB:
     def parse(self, tweet_data: dict) -> None:
         tweet_id = tweet_data["data"]["id"]
         self.logger.info(f"Parsing Tweet {tweet_id}")
-        tweet_text = tweet_data["data"]["text"].replace("\n",'')
+        tweet_text = tweet_data["data"]["text"].replace("\n", "")
         self.logger.debug(f"Tweet Text: {tweet_text}")
         tweet_author = tweet_data["data"]["author_id"]
         self.logger.debug(f"Tweet Author: {tweet_author}")
@@ -513,7 +528,7 @@ class TweetDB:
 class TweetStream:
     def __init__(self, bearer_token: str, db_path: str):
         self.log_root = self.create_loggers()
-        
+
         # self.log_root.info(self.user_mapping)
         self.tweet_dict = {}
         self.tweet_q = Queue(0)
@@ -617,6 +632,6 @@ class TweetStream:
 if __name__ == "__main__":
     bearer_token = os.environ.get("BEARER_TOKEN")
     # stream = TweetStream(bearer_token, "test.db")
-    postgres_args =  {"host": "localhost", "database": "template1", "user": "postgres"}
+    postgres_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
     stream = TweetStream(bearer_token, postgres_args)
     stream.run()
