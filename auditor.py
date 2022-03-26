@@ -15,6 +15,6 @@ if __name__ == "__main__":
     # ! ADD MORE ERROR CATCHES!
     bearer_token = os.environ.get("BEARER_TOKEN")
     # stream = TweetStream(bearer_token, "test.db")
-    postgres_args =  {"host": "localhost", "database": "template1", "user": "postgres"}
+    postgres_args =  {"host": "localhost", "dbname": "tweet_audit", "user": "sami","password":"admin", "port":"5432"}
     stream = TweetStream(bearer_token, postgres_args)
     stream.run()

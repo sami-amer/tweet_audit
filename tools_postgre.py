@@ -94,12 +94,12 @@ class Toolkit:
             cur = conn.cursor()
             current_names = cur.execute(
                 psql.SQL("SELECT USER_NAME FROM {};").format(
-                    psql.Identifier("ID_NAME_MAPPING")
+                    psql.Identifier("id_name_mapping")
                 )
             )
             current_names=cur.fetchall()
             current_names = [name[0] for name in current_names] if current_names else None
-            conn.close()
+            # conn.close()
         self.logger.info("Got names from DB")
         names_set = set(current_names) if current_names else set()
         users_add = [name for name in users if name not in names_set]
@@ -128,12 +128,12 @@ class Toolkit:
         curr = conn.cursor()
         curr.executemany(
             psql.SQL("INSERT INTO {} VALUES (%s,%s,%s)").format(
-                psql.Identifier("ID_NAME_MAPPING")
+                psql.Identifier("id_name_mapping")
             ),
             flattened_responses,
         )
         conn.commit()
-        conn.close()
+        # conn.close()
 
     @staticmethod
     def create_loggers() -> logging.Logger:
@@ -288,35 +288,45 @@ class Toolkit:
                     USER_ID BIGINT PRIMARY KEY NOT NULL,
                     USER_NAME TEXT NOT NULL,
                     USER_FULL_NAME TEXT);"""
-                    ).format(psql.Identifier("ID_NAME_MAPPING"))
+                    ).format(psql.Identifier("id_name_mapping"))
                 )
+                conn.commit()
             except psycopg2.errors.DuplicateTable:
-                self.logger.warning("DUPLICATE TABLE, ID_NAME_MAPPING EXISTS")
+                self.logger.warning("DUPLICATE TABLE, id_name_mapping EXISTS")
+                cur.execute("ROLLBACK;")
+                conn.commit()
             try:
                 cur.execute(
                     psql.SQL(
                         """CREATE TABLE {} (
-                    TWEET_ID BIGINT PRIMARY KEY NOT NULL,
-                    AUTHOR_ID BIGINT NOT NULL,
-                    AUTHOR_NAME TEXT NOT NULL,
-                    TWEET_TEXT TEXT NOT NULL);"""
-                    ).format(psql.Identifier("TWEETS"))
+                    tweet_id BIGINT PRIMARY KEY NOT NULL,
+                    author_id BIGINT NOT NULL,
+                    author_name TEXT NOT NULL,
+                    tweet_text TEXT NOT NULL);"""
+                    ).format(psql.Identifier("tweets"))
                 )
+                conn.commit()
             except psycopg2.errors.DuplicateTable:
-                self.logger.warning("DUPLICATE TABLE, TWEETS EXISTS")
-            conn.commit()
+                self.logger.warning("DUPLICATE TABLE, tweets EXISTS")
+                cur.execute("ROLLBACK;")
+                conn.commit()
 
-            cur.execute(
-                psql.SQL("INSERT INTO {} VALUES (%s,%s,%s,%s);").format(psql.Identifier("TWEETS")),
+            try:
+                cur.execute(
+                psql.SQL("INSERT INTO {} VALUES (%s,%s,%s,%s);").format(psql.Identifier("tweets")),
                 (1, 1, "testName", "testText"),
             )
-            conn.commit()
+                conn.commit()
+            except psycopg2.errors.UniqueViolation:
+                cur.execute("ROLLBACK;")
+                conn.commit()
 
     def test_connection(self):
         with psycopg2.connect(**self.db_args) as conn:
             cur = conn.cursor()
-            cur.execute(psql.SQL("SELECT TWEET_ID FROM {} WHERE TWEET_ID=1;").format(psql.Identifier("TWEETS")))
-            conn.commit()
+            cur.execute(psql.SQL("SELECT tweet_id FROM {} WHERE tweet_id=1;").format(psql.Identifier("tweets")))
+            a = cur.fetch()
+            self.logger.info("Connection Successful!")
 
     # def add_users(self,user_ids:list[tuple]) -> None:
     #     rules = []
@@ -341,10 +351,11 @@ if __name__ == "__main__":
     american_news = ["AP","WhiteHouse","FoxNews","CNN","potus","msnbc"]
     
     bearer_token = os.environ.get("BEARER_TOKEN")
-    db_args = {"host": "localhost", "database": "template1", "user": "postgres"}
+    db_args = {"host": "localhost", "dbname": "tweet_audit", "user": "sami","password":"admin", "port":"5432"}
     
     # kit = Toolkit(bearer_token, "test.db")
     kit = Toolkit(bearer_token, db_args)
+    kit.test_connection()
     
     # kit.initialize_db()
     # kit.update_author_to_id()

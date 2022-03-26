@@ -322,12 +322,15 @@ class PostgresPipe:
         with psycopg2.connect(**self.db_args) as conn:
             cur = conn.cursor()
             try:
-                cur.execute(psql.SQL("SELECT USER_ID,USER_NAME FROM {};").format(psql.Identifier("ID_NAME_MAPPING")))
+                cur.execute(psql.SQL("SELECT user_id,user_name FROM {};").format(psql.Identifier("id_name_mapping")))
             except Exception as err:
                 self.logger.error(f"ERROR DOWNLOADING USER MAPPING {err}")
-            user_data = cur.fetchall()
+            try:
+                user_data = cur.fetchall()
+            except:
+                user_data = None
             if user_data == None:
-                self.logger.warning("ID_NAME_MAPPING Empty. Is this expected?")
+                self.logger.warning("id_name_mapping Empty. Is this expected?")
                 return
             for data in user_data:
                 user_mapping[data[0]] = data[1]
@@ -353,7 +356,7 @@ class PostgresPipe:
             cur = conn.cursor()
             try:
                 cur.execute(
-                    psql.SQL("""INSERT INTO {} (TWEET_ID,AUTHOR_ID,AUTHOR_NAME,TWEET_TEXT) VALUES (%s,%s,%s,%s)""").format(psql.Identifier("TWEETS")),
+                    psql.SQL("""INSERT INTO {} (tweet_id,author_id,author_name,tweet_text) VALUES (%s,%s,%s,%s)""").format(psql.Identifier("tweets")),
                     insert_values,
                 )
                 conn.commit()
@@ -419,7 +422,7 @@ class TweetDB:
                         self.logger.info(f"Sleeping DB for {timeout} seconds")
                         time.sleep(timeout)
                         retries += 1
-                self.offload_db()
+                # self.offload_db()
                 self.logger.info("Sleeping DB")
                 self.events["local_db"].clear()
                 self.wait_to_wake()
@@ -492,7 +495,7 @@ class TweetDB:
                     self.events["sql"].set()
             except queue.Empty:
                 self.logger.info("Queue is empty, sleeping")
-                self.offload_db()
+                # self.offload_db()
                 self.logger.info("Sleeping DB")
                 self.events["local_db"].clear()
                 self.wait_to_wake()
