@@ -1,4 +1,5 @@
 # native
+import atexit
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from http.client import responses
@@ -19,7 +20,7 @@ import psycopg
 import psycopg.sql as psql
 
 # lib
-from . import POSTGRES_ARGS, SQLLITE_ARGS
+from . import MAC_ARGS, POSTGRES_ARGS, SQLLITE_ARGS
 
 
 class TwitterHandler:
@@ -563,6 +564,8 @@ class TweetStream:
     def __init__(self, bearer_token: str, db_path: str):
         self.log_root = self.create_loggers()
 
+        atexit.register(self.kill)
+
         # self.log_root.info(self.user_mapping)
         self.tweet_dict = {}
         self.tweet_q = Queue(0)
@@ -571,7 +574,7 @@ class TweetStream:
         self.events = {"local_db": Event(), "sql": Event(), "killall":Event()}
         # self.events['local_db'].set()
         # self.events['sql'].set()
-        self.handler = TwitterHandler(bearer_token, logging.getLogger("Handler"))
+        self.handler = TwitterHandler(bearer_token, self.events,logging.getLogger("Handler"))
         # self.handler = fakeTwitterHandler(logging.getLogger("Handler"))
         # self.sql_pipe = SQLlitePipe(
         #     db_path, self.db_q, self.events, logging.getLogger("SQL_Database")
@@ -588,6 +591,20 @@ class TweetStream:
             self.user_mapping,
             logging.getLogger("Local_Dict"),
         )
+
+    def kill(self):
+        self.log_root.warning("Setting local_db flag")
+        self.events["local_db"].set()
+        self.log_root.warning("local_db flag set")
+
+        self.log_root.warning("Setting sql flag")
+        self.events["sql"].set()
+        self.log_root.warning("sql flag set")
+        
+        self.log_root.warning("Setting killall flag")
+        self.events["killall"].set()
+        self.log_root.warning("killall flag set")
+
 
     @staticmethod
     def create_loggers() -> logging.Logger:
@@ -650,8 +667,8 @@ class TweetStream:
     def run(self):
         with ThreadPoolExecutor(4) as executor:
             cache_future = executor.submit(self.cache)
-            parse_future = executor.submit(self.parse)
-            offload_future = executor.submit(self.offload)
+            parse_future = executor.submit(self.parse,daemon = True)
+            offload_future = executor.submit(self.offload, daemon = True)
             # self.log_root(threading.excepthook(cache_future))
             # if cache_future:
             #     self.log_root(cache_future)
@@ -667,5 +684,5 @@ if __name__ == "__main__":
     bearer_token = os.environ.get("BEARER_TOKEN")
     # stream = TweetStream(bearer_token, "test.db")
     # postgres_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
-    stream = TweetStream(bearer_token, POSTGRES_ARGS)
+    stream = TweetStream(bearer_token, MAC_ARGS)
     stream.run()

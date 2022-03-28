@@ -8,7 +8,7 @@ import psycopg.sql as psql
 
 # lib
 from classes.classesv1 import TwitterHandler
-
+from classes import POSTGRES_ARGS, SQLLITE_ARGS, MAC_ARGS
 
 class Toolkit:
     def __init__(self, bearer_token, db_args):
@@ -351,7 +351,8 @@ if __name__ == "__main__":
     american_news = ["AP", "WhiteHouse", "FoxNews", "CNN", "potus", "msnbc"]
 
     bearer_token = os.environ.get("BEARER_TOKEN")
-    db_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
+    # db_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
+    db_args = MAC_ARGS
 
     # kit = Toolkit(bearer_token, "test.db")
     kit = Toolkit(bearer_token, db_args)
