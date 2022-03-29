@@ -23,10 +23,11 @@ export 'REDIS_HOST'='<your_redis_host>'
 """
 
 
-redis_host = os.environ.get("REDIS_HOST")
+# redis_host = os.environ.get("REDIS_HOST")
 
-redis_pass = os.environ.get("REDIS_PASS")
+# redis_pass = os.environ.get("REDIS_PASS")
 
+redis_url = os.environ.get("REDIS_URL")
 class RedisHandler:
     """
     Python Object to control TwitterAPIv2 stream
@@ -38,9 +39,9 @@ class RedisHandler:
         # export 'BEARER_TOKEN'='<your_bearer_token>'
         self.bearer_token = bearer_token
         self.logger = self.create_logger()
-        # self.r = redis.Redis(host = redis_host,port = 19142,password=redis_pass)
+        self.r = redis.from_url(redis_url)
         # self.r = redis.from_url("redis://localhost:6379", health_check_interval=30)
-        # self.r = redis.Redis()
+
         
         if self.r.ping():
             self.logger.info("PONG")

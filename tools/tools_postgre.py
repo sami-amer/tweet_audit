@@ -358,8 +358,9 @@ if __name__ == "__main__":
     kit = Toolkit(bearer_token, db_args)
     # print(kit.connection)
 
-    kit.initialize_db()
-    kit.update_author_to_id()
+    # kit.initialize_db()
+    # kit.update_author_to_id()
+    kit.test_connection()
     # kit.create_user_group_db(senators,"us_senators")
 
     # kit.update_user_rules(american_news)
