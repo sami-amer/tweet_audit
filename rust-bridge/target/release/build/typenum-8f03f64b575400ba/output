@@ -1,0 +1,2 @@
+cargo:rustc-env=TYPENUM_BUILD_CONSTS=/Users/samiatmit/Documents/Scripts/tweet_audit/rust-bridge/target/release/build/typenum-8f03f64b575400ba/out/consts.rs
+cargo:rustc-env=TYPENUM_BUILD_OP=/Users/samiatmit/Documents/Scripts/tweet_audit/rust-bridge/target/release/build/typenum-8f03f64b575400ba/out/op.rs
