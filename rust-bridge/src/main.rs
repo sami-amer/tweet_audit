@@ -65,7 +65,7 @@ fn get_ids(mut client:Client){
 
 fn insert_values(mut client: Client,tweet: Tweet)-> Result<(),postgres::Error>{
     client.execute(
-        "INSERT INTO tweet (tweet_id, author_id, author_name, tweet_text) VALUES ($1, $2, $3, $4)",
+        "INSERT INTO tweets (tweet_id, author_id, author_name, tweet_text) VALUES ($1, $2, $3, $4)",
         &[&tweet.tweet_id, &tweet.author_id, &"null",&tweet.tweet_text],
     ).unwrap();
 
