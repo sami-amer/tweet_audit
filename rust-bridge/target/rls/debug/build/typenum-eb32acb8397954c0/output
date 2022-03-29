@@ -1,2 +1,0 @@
-cargo:rustc-env=TYPENUM_BUILD_CONSTS=/Users/samiatmit/Documents/Scripts/tweet_audit/rust-bridge/target/rls/debug/build/typenum-eb32acb8397954c0/out/consts.rs
-cargo:rustc-env=TYPENUM_BUILD_OP=/Users/samiatmit/Documents/Scripts/tweet_audit/rust-bridge/target/rls/debug/build/typenum-eb32acb8397954c0/out/op.rs
