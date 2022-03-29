@@ -222,6 +222,7 @@ class RedisHandler:
             )
 
         for response_line in response.iter_lines():
+            self.logger.info("Starting Stream")
             if response_line:
                 json_response = json.loads(response_line)
                 self.logger.info(f"json respone: {json_response}")
