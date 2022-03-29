@@ -232,4 +232,4 @@ class RedisHandler:
 if __name__ == '__main__':
     bearer_token = os.environ.get("BEARER_TOKEN")
     handler = RedisHandler(bearer_token)
-    # handler.stream()
+    handler.stream()
