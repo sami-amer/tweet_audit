@@ -34,7 +34,7 @@ fn main() {
         // let mut client = Client::connect("host=localhost user=postgres dbname=rust_test", NoTls).unwrap();
         let mut client = match Client::connect(&postgres_url, NoTls){
             Ok(client) => client,
-            Err(_) => panic!("Client Creation Failed!")
+            Err(error) => panic!("Client Creation Failed! {}",error)
         };
 
         let response = do_redis_code(&redis_url);
