@@ -10,6 +10,7 @@ import psycopg.sql as psql
 from classes.classesv1 import TwitterHandler
 from classes import POSTGRES_ARGS, SQLLITE_ARGS, MAC_ARGS, AWS_ARGS
 
+
 class Toolkit:
     def __init__(self, bearer_token, db_args):
         self.logger = self.create_loggers()

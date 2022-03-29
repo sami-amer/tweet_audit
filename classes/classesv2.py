@@ -28,7 +28,9 @@ class TwitterHandler:
     Python Object to control TwitterAPIv2 stream
     """
 
-    def __init__(self, bearer_token: str, events:dict[str,Event], logger: logging.Logger):
+    def __init__(
+        self, bearer_token: str, events: dict[str, Event], logger: logging.Logger
+    ):
         # To set your enviornment variables in your terminal run the following line:
         # export 'BEARER_TOKEN'='<your_bearer_token>'
         self.bearer_token = bearer_token
@@ -181,7 +183,6 @@ class TwitterHandler:
                 yield json_response
         self.logger.error("STREAM BROKEN! ATTEMPTING TO TERMINATE!")
         self.kill()
-    
 
     def kill(self):
         self.logger.warning("Setting local_db flag")
@@ -191,12 +192,10 @@ class TwitterHandler:
         self.logger.warning("Setting sql flag")
         self.events["sql"].set()
         self.logger.warning("sql flag set")
-        
+
         self.logger.warning("Setting killall flag")
         self.events["killall"].set()
         self.logger.warning("killall flag set")
-        
-                
 
 
 @dataclass
@@ -229,7 +228,7 @@ class Tweet:
 
 
 class SQLlitePipe:
-    def __init__(self, db_path, db_q, events: dict[str,Event], logger: logging.Logger):
+    def __init__(self, db_path, db_q, events: dict[str, Event], logger: logging.Logger):
         self.db_path = db_path
         self.db_q = db_q
         self.events = events
@@ -320,7 +319,7 @@ class SQLlitePipe:
 
 
 class PostgresPipe:
-    def __init__(self, db_args, db_q, events: dict[str,Event], logger: logging.Logger):
+    def __init__(self, db_args, db_q, events: dict[str, Event], logger: logging.Logger):
         self.db_args = db_args
         self.connection = psycopg.connect(**self.db_args)
         self.db_q = db_q
@@ -393,7 +392,6 @@ class PostgresPipe:
         else:
             self.connect_to_queue()
 
-
     def execute_SQL(self, insert_values):
         self.logger.info("Executing SQL Commands")
         with self.connection as conn:
@@ -442,7 +440,7 @@ class TweetDB:
         tweet_dict: dict,
         response_q: Queue,
         db_q: Queue,
-        events: dict[str,Event],
+        events: dict[str, Event],
         id_mapping: dict,
         logger: logging.Logger,
     ):
@@ -571,10 +569,12 @@ class TweetStream:
         self.tweet_q = Queue(0)
         self.db_q = Queue(0)
 
-        self.events = {"local_db": Event(), "sql": Event(), "killall":Event()}
+        self.events = {"local_db": Event(), "sql": Event(), "killall": Event()}
         # self.events['local_db'].set()
         # self.events['sql'].set()
-        self.handler = TwitterHandler(bearer_token, self.events,logging.getLogger("Handler"))
+        self.handler = TwitterHandler(
+            bearer_token, self.events, logging.getLogger("Handler")
+        )
         # self.handler = fakeTwitterHandler(logging.getLogger("Handler"))
         # self.sql_pipe = SQLlitePipe(
         #     db_path, self.db_q, self.events, logging.getLogger("SQL_Database")
@@ -600,11 +600,10 @@ class TweetStream:
         self.log_root.warning("Setting sql flag")
         self.events["sql"].set()
         self.log_root.warning("sql flag set")
-        
+
         self.log_root.warning("Setting killall flag")
         self.events["killall"].set()
         self.log_root.warning("killall flag set")
-
 
     @staticmethod
     def create_loggers() -> logging.Logger:
@@ -667,8 +666,8 @@ class TweetStream:
     def run(self):
         with ThreadPoolExecutor(4) as executor:
             cache_future = executor.submit(self.cache)
-            parse_future = executor.submit(self.parse,daemon = True)
-            offload_future = executor.submit(self.offload, daemon = True)
+            parse_future = executor.submit(self.parse, daemon=True)
+            offload_future = executor.submit(self.offload, daemon=True)
             # self.log_root(threading.excepthook(cache_future))
             # if cache_future:
             #     self.log_root(cache_future)

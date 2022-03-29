@@ -22,6 +22,7 @@ To set your enviornment variables in your terminal run the following line:
 export 'BEARER_TOKEN'='<your_bearer_token>'
 """
 
+
 class TwitterHandler:
     """
     Main class that controls the connection to the Twitter v2 API Stream
@@ -32,7 +33,7 @@ class TwitterHandler:
     """
 
     def __init__(self, bearer_token: str, logger: logging.Logger):
-        
+
         self.bearer_token = bearer_token
         self.logger = logger
 
@@ -45,7 +46,7 @@ class TwitterHandler:
         r.headers["User-Agent"] = "v2UserLookupPython"
         return r
         # ---
-        
+
     def get_from_endpoint(self, url: str, params=None) -> dict:
         """
         Connnects to the Twitter API using the given url and params
@@ -91,19 +92,19 @@ class TwitterHandler:
         url = "https://api.twitter.com/2/tweets/search/stream/rules"
         response = self.get_from_endpoint(url)
         self.logger.debug(f"Rule Get Response: {json.dumps(response)}")
-        
+
         try:
             data = response["data"]
             meta = response["meta"]
             info = {"rules": data, "rule_count": meta["result_count"]}
             self.logger.info(info)
-        
+
             return info, response
-        
+
         except KeyError:
             self.logger.warning("No Rules Found!")
             warnings.warn("No Rules Found!")
-        
+
             return None, response
 
     def delete_all_rules(self, rules_response: json) -> None:
@@ -114,19 +115,19 @@ class TwitterHandler:
             return None
 
         ids = list(map(lambda rule: rule["id"], rules_response["data"]))
-        
+
         payload = {"delete": {"ids": ids}}
-        
+
         url = "https://api.twitter.com/2/tweets/search/stream/rules"
-        
+
         response = self.post_to_endpoint(url, payload)
 
         try:
-        
+
             self.logger.debug(f"Rule Deletion Response: {json.dumps(response)}")
-        
+
         except:
-        
+
             self.logger.debug(f"Rule Deletion Response: {response}")
 
     def delete_rules(self, ids: list) -> None:
@@ -202,9 +203,8 @@ class TwitterHandler:
                 json_response = json.loads(response_line)
                 self.logger.debug(f"json respone: {json_response}")
                 yield json_response
-                
-        self.logger.error("STREAM BROKEN!")
 
+        self.logger.error("STREAM BROKEN!")
 
 
 @dataclass
@@ -257,6 +257,7 @@ class TweetDB:
         """
         Method wrapper that attempts a function `retry` amount of times, with `timeout` seconds in between
         """
+
         def the_real_decorator(function):
             def wrapper(self, *args, **kwargs):
                 retries = 0
@@ -366,6 +367,7 @@ class SQLPipe:
         """
         Method wrapper that attempts a function `retry` amount of times, with `timeout` seconds in between
         """
+
         def the_real_decorator(function):
             def wrapper(self, *args, **kwargs):
                 retries = 0

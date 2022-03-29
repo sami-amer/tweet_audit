@@ -16,12 +16,11 @@ from classes import POSTGRES_ARGS, SQLLITE_ARGS, MAC_ARGS
 from classes.classesv2 import TweetStream
 
 
-
 if __name__ == "__main__":
     # ! ADD MORE ERROR CATCHES!
     bearer_token = os.environ.get("BEARER_TOKEN")
     # stream = TweetStream(bearer_token, "test.db")
     # postgres_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
-    
+
     stream = TweetStream(bearer_token, MAC_ARGS)
     stream.run()

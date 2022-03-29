@@ -28,11 +28,12 @@ export 'REDIS_HOST'='<your_redis_host>'
 # redis_pass = os.environ.get("REDIS_PASS")
 
 redis_url = os.environ.get("REDIS_URL")
+
+
 class RedisHandler:
     """
     Python Object to control TwitterAPIv2 stream
     """
-
 
     def __init__(self, bearer_token: str):
         # To set your enviornment variables in your terminal run the following line:
@@ -42,10 +43,8 @@ class RedisHandler:
         self.r = redis.from_url(redis_url)
         # self.r = redis.from_url("redis://localhost:6379", health_check_interval=30)
 
-        
         if self.r.ping():
             self.logger.info("PONG")
-
 
     @staticmethod
     def create_logger():
@@ -62,7 +61,6 @@ class RedisHandler:
 
         log_redis = logging.getLogger("Redis")
 
-
         ch = logging.StreamHandler()
         ch.setLevel(logging.INFO)
         ch.setFormatter(formatter)
@@ -74,8 +72,6 @@ class RedisHandler:
 
         log_redis.addHandler(fh_redis)
         log_redis.addHandler(ch)
-
-
 
         # log_root.addHandler(fh_root)
         # log_root.addHandler(ch)
@@ -227,11 +223,11 @@ class RedisHandler:
             if response_line:
                 json_response = json.loads(response_line)
                 self.logger.info(f"json respone: {json_response}")
-                self.r.lpush("tweets",json.dumps(json_response))
-        self.logger.error("STREAM BROKEN! ATTEMPTING TO TERMINATE!")    
+                self.r.lpush("tweets", json.dumps(json_response))
+        self.logger.error("STREAM BROKEN! ATTEMPTING TO TERMINATE!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     bearer_token = os.environ.get("BEARER_TOKEN")
     handler = RedisHandler(bearer_token)
     handler.stream()
