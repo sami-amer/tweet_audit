@@ -1,16 +1,43 @@
 use redis::{self, Commands};
 use serde::{Deserialize, Serialize};
 use postgres::{Client, NoTls};
+use std::env;
 fn main() {
     println!("HELLO RUST!");
 
-    let url : String = String::from("redis://localhost:6379");
-    // let url : String = String::from("redis://default:Yo3FlDJxKLt8WW7RSnEMMQDmiZ5Bclf5@redis-19142.c284.us-east1-2.gce.cloud.redislabs.com:19142/0");
+    let redis_url = match env::var("REDIS_URL"){
+        Ok(host_string) => host_string,
+        Err(_) => String::from("REDIS_URL_NOT_SET")
+    };
+    // let url : String = String::from("redis://localhost:6379");
     
     
     loop{
-        let mut client = Client::connect("host=localhost user=postgres dbname=rust_test", NoTls).unwrap();
-        let response = do_redis_code(&url);
+        let host = match env::var("POSTGRES_HOST"){
+            Ok(host_string) => host_string,
+            Err(_) => String::from("HOST_NOT_SET")
+        };
+
+        let dbname = match env::var("POSTGRES_DBNAME"){
+            Ok(host_string) => host_string,
+            Err(_) => String::from("DBNAME_NOT_SET")
+        };
+
+        let postgres_password = match env::var("POSTGRES_PASS"){
+            Ok(host_string) => host_string,
+            Err(_) => String::from("PASSWORD_NOT_SET")
+        };
+
+        let postgres_url: String = format!("host={} user=postgres dbname={} password = {} port=5432",host,dbname,postgres_password);
+        println!("URL is {}",&postgres_url);
+
+        // let mut client = Client::connect("host=localhost user=postgres dbname=rust_test", NoTls).unwrap();
+        let mut client = match Client::connect(&postgres_url, NoTls){
+            Ok(client) => client,
+            Err(_) => panic!("Client Creation Failed!")
+        };
+
+        let response = do_redis_code(&redis_url);
         let parsed = parse_json(response.unwrap());
         let tweet = create_tweet(parsed);
         println!("Inserting Tweet with id: {}", tweet.tweet_id);
@@ -38,8 +65,8 @@ fn get_ids(mut client:Client){
 
 fn insert_values(mut client: Client,tweet: Tweet)-> Result<(),postgres::Error>{
     client.execute(
-        "INSERT INTO tweet (tweet_id, author_id, tweet_text) VALUES ($1, $2, $3)",
-        &[&tweet.tweet_id, &tweet.author_id, &tweet.tweet_text],
+        "INSERT INTO tweet (tweet_id, author_id, author_name, tweet_text) VALUES ($1, $2, $3, $4)",
+        &[&tweet.tweet_id, &tweet.author_id, &"null",&tweet.tweet_text],
     ).unwrap();
 
     client.close()

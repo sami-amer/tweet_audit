@@ -15,3 +15,4 @@ toml_dict= toml.load("classes/.server.toml")
 POSTGRES_ARGS = toml_dict["postgres"]
 SQLLITE_ARGS = toml_dict["sqllite"]
 MAC_ARGS =  toml_dict["postgres-mac"]
+AWS_ARGS = toml_dict["AWS"]

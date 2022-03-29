@@ -8,7 +8,7 @@ import psycopg.sql as psql
 
 # lib
 from classes.classesv1 import TwitterHandler
-from classes import POSTGRES_ARGS, SQLLITE_ARGS, MAC_ARGS
+from classes import POSTGRES_ARGS, SQLLITE_ARGS, MAC_ARGS, AWS_ARGS
 
 class Toolkit:
     def __init__(self, bearer_token, db_args):
@@ -348,18 +348,18 @@ if __name__ == "__main__":
     # df = pd.read_csv("_data/senate_usernames_dec21.csv")
     # senators = df["username"].to_list()
 
-    american_news = ["AP", "WhiteHouse", "FoxNews", "CNN", "potus", "msnbc"]
+    # american_news = ["AP", "WhiteHouse", "FoxNews", "CNN", "potus", "msnbc"]
 
     bearer_token = os.environ.get("BEARER_TOKEN")
     # db_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
-    db_args = MAC_ARGS
+    db_args = AWS_ARGS
 
     # kit = Toolkit(bearer_token, "test.db")
     kit = Toolkit(bearer_token, db_args)
-    print(kit.connection)
+    # print(kit.connection)
 
-    # kit.initialize_db()
-    # kit.update_author_to_id()
+    kit.initialize_db()
+    kit.update_author_to_id()
     # kit.create_user_group_db(senators,"us_senators")
 
     # kit.update_user_rules(american_news)
