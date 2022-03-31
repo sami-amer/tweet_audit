@@ -1,39 +1,19 @@
 use postgres::{Client, NoTls};
 use redis::{self, Commands};
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
 use std::env;
 fn main() {
     println!("HELLO RUST!");
 
-    let redis_url = match env::var("REDIS_URL") {
-        Ok(host_string) => host_string,
-        Err(_) => String::from("REDIS_URL_NOT_SET"),
-    };
-    // let url : String = String::from("redis://localhost:6379");
+    let connection_vars = get_connection_vars();
 
-    let host = match env::var("POSTGRES_HOST") {
-        Ok(host_string) => host_string,
-        Err(_) => String::from("HOST_NOT_SET"),
-    };
+    let postgres_url = connection_vars.get(0).unwrap();
+    let redis_url = connection_vars.get(1).unwrap();
 
-    let dbname = match env::var("POSTGRES_DBNAME") {
-        Ok(host_string) => host_string,
-        Err(_) => String::from("DBNAME_NOT_SET"),
-    };
-
-    let postgres_password = match env::var("POSTGRES_PASS") {
-        Ok(host_string) => host_string,
-        Err(_) => String::from("PASSWORD_NOT_SET"),
-    };
-
-    let postgres_url: String = format!(
-        "host={} user=postgres dbname={} password = {} port=5432",
-        host, dbname, postgres_password
-    );
     println!("URL is {}", &postgres_url);
     loop {
         // let mut client = Client::connect("host=localhost user=postgres dbname=rust_test", NoTls).unwrap();
-        let mut client = match Client::connect(&postgres_url, NoTls) {
+        let client = match Client::connect(&postgres_url, NoTls) {
             Ok(client) => client,
             Err(error) => panic!("Client Creation Failed! {}", error),
         };
@@ -42,20 +22,10 @@ fn main() {
         let parsed = parse_json(response.unwrap());
         let tweet = create_tweet(parsed);
         println!("Inserting Tweet with id: {}", tweet.tweet_id);
-        let insert_result = match insert_values(client, tweet) {
+        let _insert_result = match insert_values(client, tweet) {
             Ok(_) => continue,
             Err(error) => println!("Error! {}", error),
         };
-    }
-
-    println!("Loop BROKEN!")
-}
-
-fn get_ids(mut client: Client) {
-    for row in client.query("SELECT tweet_id FROM tweets", &[]).unwrap() {
-        let id: i64 = row.get(0);
-
-        println!("found person: {}", id);
     }
 }
 
@@ -116,6 +86,36 @@ fn create_tweet(parsed_json: serde_json::Value) -> Tweet {
     tweet
 }
 
+fn get_connection_vars() -> [String; 2] {
+    let redis_url = match env::var("REDIS_URL") {
+        Ok(host_string) => host_string,
+        Err(_) => String::from("REDIS_URL_NOT_SET"),
+    };
+    // let url : String = String::from("redis://localhost:6379");
+
+    let host = match env::var("POSTGRES_HOST") {
+        Ok(host_string) => host_string,
+        Err(_) => String::from("HOST_NOT_SET"),
+    };
+
+    let dbname = match env::var("POSTGRES_DBNAME") {
+        Ok(host_string) => host_string,
+        Err(_) => String::from("DBNAME_NOT_SET"),
+    };
+
+    let postgres_password = match env::var("POSTGRES_PASS") {
+        Ok(host_string) => host_string,
+        Err(_) => String::from("PASSWORD_NOT_SET"),
+    };
+
+    let postgres_url: String = format!(
+        "host={} user=postgres dbname={} password = {} port=5432",
+        host, dbname, postgres_password
+    );
+
+    [postgres_url, redis_url]
+}
+
 // fn do_redis_code(url: &str) -> redis::RedisResult<(String)> {
 fn do_redis_code(url: &str) -> redis::RedisResult<String> {
     // general connection handling
@@ -129,13 +129,6 @@ fn do_redis_code(url: &str) -> redis::RedisResult<String> {
     let item: Vec<String> = con
         .brpop(list_name, 0)
         .expect("failed to execute brpop for 'tweets'");
-
-    // let extracted: String = match redis::from_redis_value(&item){
-    //     Ok(json_string) => json_string,
-    //     Err(_) => String::from("ERROR/ERROR")
-    //     // ! add a match in other funciton to check for this string
-    // };
-
     let error_str = String::from("ERROR!");
 
     let extracted = match item.get(1) {
