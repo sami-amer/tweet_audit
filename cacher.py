@@ -218,13 +218,16 @@ class RedisHandler:
             )
 
         self.logger.info("Starting Stream")
-        for response_line in response.iter_lines():
-            self.logger.info("Keep Alive Signal Received")
-            if response_line:
-                json_response = json.loads(response_line)
-                self.logger.info(f"json respone: {json_response}")
-                self.r.lpush("tweets", json.dumps(json_response))
-        self.logger.error("STREAM BROKEN! ATTEMPTING TO TERMINATE!")
+        try:
+            for response_line in response.iter_lines():
+                self.logger.info("Keep Alive Signal Received")
+                if response_line:
+                    json_response = json.loads(response_line)
+                    self.logger.info(f"json respone: {json_response}")
+                    self.r.lpush("tweets", json.dumps(json_response))
+        except:
+            self.logger.error("STREAM BROKEN! ATTEMPTING TO RECONNECT!")
+            self.stream()
 
 
 if __name__ == "__main__":
