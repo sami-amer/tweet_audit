@@ -11,3 +11,4 @@ logs/
 *.db
 .DS_Store
 rust-bridge/target
+rust_streamer/target
