@@ -10,5 +10,7 @@ logs/
 .*
 *.db
 .DS_Store
-rust-bridge/target
-rust_streamer/target
+# rust-bridge/target
+# rust_streamer/target
+target/
+*.batches

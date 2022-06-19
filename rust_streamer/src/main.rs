@@ -78,11 +78,12 @@ async fn main() -> Result<(), tokio_postgres::Error> {
                 parse_bytes(byte, pool, author_id_map).await;
             }), 
             Ok(None) => panic!("Something went wrong in the API Stream! Optional was NONE"),
-            Err(_) => panic!("Something went wrong in the API Stream! UNKNOWN ERROR"),
+            Err(e) => panic!("Something went wrong in the API Stream! UNKNOWN ERROR {}",e),
         };
     }
-
-    panic!("LOOP BROKEN!")
+    log::warn!("Loop broken, attempting to re-run main()");
+    main();
+    panic!("LOOP BROKEN! COULD NOT RE-START LOOP!")
 }
 
 
@@ -142,7 +143,12 @@ async fn postgres_insert(
     author_id_mapping: HashMap<i64, String>,
 ) -> Result<(), tokio_postgres::Error> {
     let author_id: i64 = tweet.author_id;
-    let author_name: String = author_id_mapping[&author_id].to_string();
+    log::debug!("Searching for Author ID {}",author_id);
+    // let author_name: String = author_id_mapping[&author_id].to_string();
+    let author_name: String = match author_id_mapping.get(&author_id) { // add code to automatically update authors that are not in the hashmap
+        Some(author_name) => author_name.to_string(),
+        None => panic!("Could not find author name in mapping! {}", author_id)
+    };
     let tweet_id: i64 = tweet.tweet_id;
     let tweet_text: String = tweet.text;
 
