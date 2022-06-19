@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "twit"
+path = "src/lib.rs"
 
 [dependencies]
 sawtooth-sdk = "0.5.2" 
@@ -21,4 +24,4 @@ bytes = "1"
 protobuf="2.23"
 openssl="0.10.40"
 rand="0.8.4"
-reqwest = {version = "0.11.10", features=["json"]}
+reqwest = {version = "0.11.10", features=["json","blocking"]}
