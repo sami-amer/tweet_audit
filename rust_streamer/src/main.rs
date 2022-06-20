@@ -1,6 +1,7 @@
 use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
 use bytes::Bytes;
+use streamer_utils::ledger::add_to_ledger;
 use core::panic;
 use log;
 use reqwest;
@@ -158,5 +159,8 @@ async fn postgres_insert(
         Err(e) => panic!("Error when adding value to SQL: {}", e)
     };
     log::info!("Statement for id {} executed! rows modified: {}",tweet_id, mod_row_count);
+    log::info!("Adding to ledger");
+    add_to_ledger(String::from("set"), tweet_id.to_string(), author_id.to_string(), author_name.to_string(), tweet_text.to_string());
     Ok(())
+    
 }

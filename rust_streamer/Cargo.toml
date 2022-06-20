@@ -4,12 +4,16 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Sami Amer <contact@sami.ps>"]
 
+[lib]
+name = "streamer_utils"
+path = "src/lib.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1.8"
-reqwest = {version = "0.11.10", features=["json"]}
+reqwest = {version = "0.11.10", features=["json","blocking"]}
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4.7"
 env_logger = "0.9.0"
@@ -20,3 +24,13 @@ postgres="0.19.3"
 tokio-postgres = '0.7.6'
 bb8="0.8.0"
 bb8-postgres= "0.8.0"
+sawtooth-sdk = "0.5.2" 
+sha2 = "0.10"
+hex = "0.4"
+clap = "2"
+log4rs = "0.8"
+cbor-codec = "0.7"
+serde_cbor = "0.11.2"
+protobuf="2.23"
+openssl="0.10.40"
+rand="0.8.4"

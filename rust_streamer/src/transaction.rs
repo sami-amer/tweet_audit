@@ -17,14 +17,21 @@ use sawtooth_sdk::processor::handler::ApplyError;
 use sawtooth_sdk::processor::handler::TransactionContext;
 use sawtooth_sdk::processor::handler::TransactionHandler;
 
-const MAX_VALUE: u32 = 4_294_967_295;
-const MAX_NAME_LEN: usize = 20;
+use log::info;
+// use bytes::Bytes;
+// use serde;
+// use serde_json;
+// use serde_cbor;
 
-#[derive(Copy, Clone)]
+fn get_twit_prefix() -> String {
+    hex::encode(Sha512::digest(b"twit"))[..6].to_string()
+}
+
+#[derive(Clone, Copy)]
 enum Verb {
     Set,
-    Increment,
-    Decrement,
+    Delete,
+    Get,
 }
 
 impl fmt::Display for Verb {
@@ -34,25 +41,21 @@ impl fmt::Display for Verb {
             "{}",
             match *self {
                 Verb::Set => "Verb::Set",
-                Verb::Increment => "Verb::Increment",
-                Verb::Decrement => "Verb::Decrement",
+                Verb::Delete => "Verb::Delete",
+                Verb::Get => "Verb::Return",
             }
         )
     }
 }
-
-fn get_intkey_prefix() -> String {
-    hex::encode(Sha512::digest(b"intkey"))[..6].to_string()
-}
-
-struct IntkeyPayload {
+struct TwitPayload {
     verb: Verb,
     name: String,
+    // value: serde_json::Value,
     value: u32,
 }
 
-impl IntkeyPayload {
-    pub fn new(payload_data: &[u8]) -> Result<Option<IntkeyPayload>, ApplyError> {
+impl TwitPayload {
+    pub fn new(payload_data: &[u8]) -> Result<Option<TwitPayload>, ApplyError> {
         let input = Cursor::new(payload_data);
 
         let mut decoder = cbor::GenericDecoder::new(cbor::Config::default(), input);
@@ -65,7 +68,7 @@ impl IntkeyPayload {
         let verb_raw: String = match c.field("Verb").text_plain() {
             None => {
                 return Err(ApplyError::InvalidTransaction(String::from(
-                    "Verb must be 'set', 'inc', or 'dec'",
+                    "Verb must be 'set', 'del', or 'return'",
                 )));
             }
             Some(verb_raw) => verb_raw.clone(),
@@ -73,11 +76,11 @@ impl IntkeyPayload {
 
         let verb = match verb_raw.as_str() {
             "set" => Verb::Set,
-            "inc" => Verb::Increment,
-            "dec" => Verb::Decrement,
+            "del" => Verb::Delete,
+            "get" => Verb::Get,
             _ => {
                 return Err(ApplyError::InvalidTransaction(String::from(
-                    "Verb must be 'set', 'inc', or 'dec'",
+                    "Verb must be 'set', 'inc' or 'dec'",
                 )));
             }
         };
@@ -112,18 +115,12 @@ impl IntkeyPayload {
             Some(name_raw) => name_raw.clone(),
         };
 
-        if name_raw.len() > MAX_NAME_LEN {
-            return Err(ApplyError::InvalidTransaction(String::from(
-                "Name must be equal to or less than 20 characters",
-            )));
-        }
-
-        let intkey_payload = IntkeyPayload {
+        let twit_payload = TwitPayload {
             verb,
             name: name_raw,
             value,
         };
-        Ok(Some(intkey_payload))
+        Ok(Some(twit_payload))
     }
 
     pub fn get_verb(&self) -> Verb {
@@ -139,14 +136,14 @@ impl IntkeyPayload {
     }
 }
 
-pub struct IntkeyState<'a> {
+pub struct TwitState<'a> {
     context: &'a mut dyn TransactionContext,
     get_cache: HashMap<String, BTreeMap<Key, Value>>,
 }
 
-impl<'a> IntkeyState<'a> {
-    pub fn new(context: &'a mut dyn TransactionContext) -> IntkeyState {
-        IntkeyState {
+impl<'a> TwitState<'a> {
+    pub fn new(context: &'a mut dyn TransactionContext) -> TwitState {
+        TwitState {
             context,
             get_cache: HashMap::new(),
         }
@@ -154,11 +151,11 @@ impl<'a> IntkeyState<'a> {
 
     fn calculate_address(name: &str) -> String {
         let sha = hex::encode(Sha512::digest(name.as_bytes()))[64..].to_string();
-        get_intkey_prefix() + &sha
+        get_twit_prefix() + &sha
     }
 
     pub fn get(&mut self, name: &str) -> Result<Option<u32>, ApplyError> {
-        let address = IntkeyState::calculate_address(name);
+        let address = TwitState::calculate_address(name);
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
@@ -195,13 +192,11 @@ impl<'a> IntkeyState<'a> {
     }
 
     pub fn set(&mut self, name: &str, value: u32) -> Result<(), ApplyError> {
-        let mut map: BTreeMap<Key, Value> = match self
-            .get_cache
-            .get_mut(&IntkeyState::calculate_address(name))
-        {
-            Some(m) => m.clone(),
-            None => BTreeMap::new(),
-        };
+        let mut map: BTreeMap<Key, Value> =
+            match self.get_cache.get_mut(&TwitState::calculate_address(name)) {
+                Some(m) => m.clone(),
+                None => BTreeMap::new(),
+            };
         map.insert(Key::Text(Text::Text(String::from(name))), Value::U32(value));
 
         let mut e = GenericEncoder::new(Cursor::new(Vec::new()));
@@ -210,36 +205,36 @@ impl<'a> IntkeyState<'a> {
 
         let packed = e.into_inner().into_writer().into_inner();
         self.context
-            .set_state_entry(IntkeyState::calculate_address(name), packed)
+            .set_state_entry(TwitState::calculate_address(name), packed)
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
 
         Ok(())
     }
 }
 
-pub struct IntkeyTransactionHandler {
+pub struct TwitTransactionHandler {
     family_name: String,
     family_versions: Vec<String>,
     namespaces: Vec<String>,
 }
 
-impl Default for IntkeyTransactionHandler {
+impl Default for TwitTransactionHandler {
     fn default() -> Self {
-        IntkeyTransactionHandler {
-            family_name: "intkey".to_string(),
+        TwitTransactionHandler {
+            family_name: "twit".to_string(),
             family_versions: vec!["2.0".to_string()],
-            namespaces: vec![get_intkey_prefix()],
+            namespaces: vec![get_twit_prefix()],
         }
     }
 }
 
-impl IntkeyTransactionHandler {
-    pub fn new() -> IntkeyTransactionHandler {
+impl TwitTransactionHandler {
+    pub fn new() -> TwitTransactionHandler {
         Self::default()
     }
 }
 
-impl TransactionHandler for IntkeyTransactionHandler {
+impl TransactionHandler for TwitTransactionHandler {
     fn family_name(&self) -> String {
         self.family_name.clone()
     }
@@ -257,7 +252,7 @@ impl TransactionHandler for IntkeyTransactionHandler {
         request: &TpProcessRequest,
         context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
-        let payload = IntkeyPayload::new(request.get_payload());
+        let payload = TwitPayload::new(request.get_payload());
         let payload = match payload {
             Err(e) => return Err(e),
             Ok(payload) => payload,
@@ -271,7 +266,7 @@ impl TransactionHandler for IntkeyTransactionHandler {
             }
         };
 
-        let mut state = IntkeyState::new(context);
+        let mut state = TwitState::new(context);
 
         info!(
             "payload: {} {} {} {} {}",
@@ -296,42 +291,9 @@ impl TransactionHandler for IntkeyTransactionHandler {
                 };
                 state.set(payload.get_name(), payload.get_value())
             }
-            Verb::Increment => {
-                let orig_value: u32 = match state.get(payload.get_name()) {
-                    Ok(Some(v)) => v,
-                    Ok(None) => {
-                        return Err(ApplyError::InvalidTransaction(String::from(
-                            "inc requires a set value",
-                        )));
-                    }
-                    Err(err) => return Err(err),
-                };
-                let diff = MAX_VALUE - orig_value;
-                if diff < payload.get_value() {
-                    return Err(ApplyError::InvalidTransaction(String::from(
-                        "Value is too large to inc",
-                    )));
-                };
+            Verb::Delete => state.set(payload.get_name(), 0),
 
-                state.set(payload.get_name(), orig_value + payload.get_value())
-            }
-            Verb::Decrement => {
-                let orig_value: u32 = match state.get(payload.get_name()) {
-                    Ok(Some(v)) => v,
-                    Ok(None) => {
-                        return Err(ApplyError::InvalidTransaction(String::from(
-                            "dec requires a set value",
-                        )));
-                    }
-                    Err(err) => return Err(err),
-                };
-                if payload.get_value() > orig_value {
-                    return Err(ApplyError::InvalidTransaction(String::from(
-                        "Value is too large to dec",
-                    )));
-                };
-                state.set(payload.get_name(), orig_value - payload.get_value())
-            }
+            Verb::Get => state.set(payload.get_name(), 99),
         }
     }
 }
