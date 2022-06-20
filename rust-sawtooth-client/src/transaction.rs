@@ -47,11 +47,11 @@ impl fmt::Display for Verb {
         )
     }
 }
-struct TwitPayload { 
+struct TwitPayload {
     verb: Verb,
     name: String,
     // value: serde_json::Value,
-    value: u32 
+    value: u32,
 }
 
 impl TwitPayload {
@@ -94,7 +94,7 @@ impl TwitPayload {
                 )));
             }
         };
-        
+
         let value: u32 = match *value_raw {
             cbor::value::Value::U8(x) => u32::from(x),
             cbor::value::Value::U16(x) => u32::from(x),
@@ -118,7 +118,7 @@ impl TwitPayload {
         let twit_payload = TwitPayload {
             verb,
             name: name_raw,
-            value
+            value,
         };
         Ok(Some(twit_payload))
     }
@@ -192,13 +192,11 @@ impl<'a> TwitState<'a> {
     }
 
     pub fn set(&mut self, name: &str, value: u32) -> Result<(), ApplyError> {
-        let mut map: BTreeMap<Key, Value> = match self
-            .get_cache
-            .get_mut(&TwitState::calculate_address(name))
-        {
-            Some(m) => m.clone(),
-            None => BTreeMap::new(),
-        };
+        let mut map: BTreeMap<Key, Value> =
+            match self.get_cache.get_mut(&TwitState::calculate_address(name)) {
+                Some(m) => m.clone(),
+                None => BTreeMap::new(),
+            };
         map.insert(Key::Text(Text::Text(String::from(name))), Value::U32(value));
 
         let mut e = GenericEncoder::new(Cursor::new(Vec::new()));
@@ -293,16 +291,9 @@ impl TransactionHandler for TwitTransactionHandler {
                 };
                 state.set(payload.get_name(), payload.get_value())
             }
-            Verb::Delete => {
-                
-                state.set(payload.get_name(), 0) 
-            },
+            Verb::Delete => state.set(payload.get_name(), 0),
 
-            Verb::Get => {
-                
-                state.set(payload.get_name(), 99 ) 
-            },
-            }
+            Verb::Get => state.set(payload.get_name(), 99),
         }
     }
-
+}

@@ -5,8 +5,8 @@ extern crate bytes;
 extern crate log4rs;
 extern crate sawtooth_sdk;
 extern crate serde;
-extern crate serde_json;
 extern crate serde_cbor;
+extern crate serde_json;
 extern crate sha2;
 
 pub mod handler;

@@ -1,20 +1,18 @@
-use sawtooth_sdk::messages::transaction::{TransactionHeader, Transaction};
-use rand::{thread_rng,Rng};
-use protobuf::{RepeatedField, Message};
-use sawtooth_sdk::signing::Signer;
-use sawtooth_sdk::messages::batch::{BatchHeader,BatchList};
-use sawtooth_sdk::signing::{CryptoFactory,create_context};
 use openssl::sha::sha512;
+use protobuf::{Message, RepeatedField};
+use rand::{thread_rng, Rng};
+use sawtooth_sdk::messages::batch::{BatchHeader, BatchList};
+use sawtooth_sdk::messages::transaction::{Transaction, TransactionHeader};
+use sawtooth_sdk::signing::Signer;
+use sawtooth_sdk::signing::{create_context, CryptoFactory};
 
-pub fn create_txn_header(signer: &Signer) -> TransactionHeader{
-
+pub fn create_txn_header(signer: &Signer) -> TransactionHeader {
     // * Creating Transaction Header
     let mut txn_header = TransactionHeader::new();
     txn_header.set_family_name(String::from("twit"));
     txn_header.set_family_version(String::from("2.0"));
 
-
-    let mut nonce = [0u8;16];
+    let mut nonce = [0u8; 16];
     thread_rng()
         .try_fill(&mut nonce[..])
         .expect("Error generating random nonce");
@@ -23,8 +21,8 @@ pub fn create_txn_header(signer: &Signer) -> TransactionHeader{
     // let input_vec: Vec<String> = vec![String::from("029594d01f14ae8e74fec8552bebf40e781f2c4bc5427882b48380083c59f89429",)];
     // let output_vec: Vec<String> = vec![String::from("029594d01f14ae8e74fec8552bebf40e781f2c4bc5427882b48380083c59f89429",)];
 
-    let input_vec: Vec<String> = vec![String::from("19c62b",)];
-    let output_vec: Vec<String> = vec![String::from("19c62b",)];
+    let input_vec: Vec<String> = vec![String::from("19c62b")];
+    let output_vec: Vec<String> = vec![String::from("19c62b")];
 
     txn_header.set_inputs(RepeatedField::from_vec(input_vec));
     txn_header.set_outputs(RepeatedField::from_vec(output_vec));
@@ -42,20 +40,16 @@ pub fn create_txn_header(signer: &Signer) -> TransactionHeader{
             .expect("Error Retreiving public key")
             .as_hex(),
     );
-    
+
     txn_header
 }
 
-
 pub fn to_hex_string(bytes: &Vec<u8>) -> String {
-    let strs: Vec<String> = bytes.iter()
-        .map(|b| format!("{:02x}",b))
-        .collect();
+    let strs: Vec<String> = bytes.iter().map(|b| format!("{:02x}", b)).collect();
     strs.join("")
 }
 
 pub fn create_batch_header(signer: &Signer, txn: Transaction) -> BatchHeader {
-
     let mut batch_header = BatchHeader::new();
 
     batch_header.set_signer_public_key(
@@ -69,16 +63,14 @@ pub fn create_batch_header(signer: &Signer, txn: Transaction) -> BatchHeader {
         .iter()
         .map(|trans| String::from(trans.get_header_signature()))
         .collect();
-    
+
     batch_header.set_transaction_ids(RepeatedField::from_vec(transaction_ids));
     batch_header
-
 }
 
-pub fn create_batch_list(payload_bytes:Vec<u8>) -> BatchList{
+pub fn create_batch_list(payload_bytes: Vec<u8>) -> BatchList {
     // * Creating Signer
-    let context = create_context("secp256k1")
-        .expect("Error creating the right context");
+    let context = create_context("secp256k1").expect("Error creating the right context");
     let private_key = context
         .new_random_private_key()
         .expect("Erro generating a new private key");
@@ -115,10 +107,10 @@ pub fn create_batch_list(payload_bytes:Vec<u8>) -> BatchList{
     let batch_header_bytes = batch_header
         .write_to_bytes()
         .expect("Error converting batch header to byets");
-    
+
     // * Creating Batch
     use sawtooth_sdk::messages::batch::Batch;
-    
+
     let signature = signer
         .sign(&batch_header_bytes)
         .expect("Error signing the batch header");
@@ -134,6 +126,4 @@ pub fn create_batch_list(payload_bytes:Vec<u8>) -> BatchList{
     let mut batch_list = BatchList::new();
     batch_list.set_batches(RepeatedField::from_vec(vec![batch]));
     batch_list
-
 }
-
