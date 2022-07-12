@@ -27,8 +27,9 @@ async fn main() -> Result<(), tokio_postgres::Error> {
         .build()
         .unwrap();
 
+    let pg_connection_url: String = get_connection_vars();
     let pg_manager = match PostgresConnectionManager::new_from_stringlike(
-        "host=localhost user=sami dbname=tweet_audit password=admin port=5432",
+        &pg_connection_url,
         tokio_postgres::NoTls,
     ) {
         Ok(manager)=> manager,
@@ -48,7 +49,7 @@ async fn main() -> Result<(), tokio_postgres::Error> {
     };
 
     let author_id_vec = match initial_conn
-        .query("SELECT DISTINCT author_id, author_name FROM tweets;", &[])
+        .query("SELECT user_id,user_name FROM id_name_mapping;", &[])
         .await
     {
         Ok(vec) => vec,
@@ -59,7 +60,7 @@ async fn main() -> Result<(), tokio_postgres::Error> {
 
     log::info!("Author ID Map created");
     for row in author_id_vec {
-        author_id_map.insert(row.get("author_id"), row.get("author_name"));
+        author_id_map.insert(row.get("user_id"), row.get("user_name"));
     }
 
     let mut response = match client.get(url).bearer_auth(auth_token).send().await {
@@ -87,6 +88,42 @@ async fn main() -> Result<(), tokio_postgres::Error> {
     panic!("LOOP BROKEN! COULD NOT RE-START LOOP!")
 }
 
+
+fn get_connection_vars() -> String {
+    // let url : String = String::from("redis://localhost:6379");
+
+    let host = match env::var("POSTGRES_HOST") {
+        Ok(host_string) => host_string,
+        Err(_) => String::from("HOST_NOT_SET"),
+    };
+
+    let dbname = match env::var("POSTGRES_DBNAME") {
+        Ok(host_string) => host_string,
+        Err(_) => String::from("DBNAME_NOT_SET"),
+    };
+
+    let postgres_password = match env::var("POSTGRES_PASS") {
+        Ok(host_string) => host_string,
+        Err(_) => String::from("PASSWORD_NOT_SET"),
+    };
+
+    let postgres_user = match env::var("POSTGRES_USER") {
+        Ok(host_string) => host_string,
+        Err(_) => String::from("postgres")
+    };
+
+    let postgres_port = match env::var("POSTGRES_PORT") {
+        Ok(host_string) => host_string,
+        Err(_) => String::from("5432")
+    };
+
+    let postgres_url: String = format!(
+        "host={} user={} dbname={} password={} port={}",
+        host, postgres_user, dbname, postgres_password, postgres_port
+    );
+
+    postgres_url
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Tweet {

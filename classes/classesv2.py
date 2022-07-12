@@ -64,7 +64,7 @@ class TwitterHandler:
 
     def post_to_endpoint(self, url: str, payload: dict) -> dict:
         response = requests.post(url, auth=self.bearer_oauth, json=payload)
-        if response.status_code != 200:
+        if response.status_code != 200 or response.status_code != 201:
             raise Exception(
                 "Cannot delete rules (HTTP {}): {}".format(
                     response.status_code, response.text
@@ -149,6 +149,7 @@ class TwitterHandler:
             }
 
             return info
+        return None
 
     def stream(self):
         """

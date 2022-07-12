@@ -7,14 +7,14 @@ import psycopg
 import psycopg.sql as psql
 
 # lib
-from classes.classesv1 import TwitterHandler
+from classes.classesv2 import TwitterHandler
 from classes import POSTGRES_ARGS, SQLLITE_ARGS, MAC_ARGS, AWS_ARGS
 
 
 class Toolkit:
     def __init__(self, bearer_token, db_args):
         self.logger = self.create_loggers()
-        self.handler = TwitterHandler(bearer_token, self.logger)
+        self.handler = TwitterHandler(bearer_token, None,self.logger)
         self.db_args = db_args
 
         try:
@@ -68,9 +68,9 @@ class Toolkit:
         curr_rule = curr_rule[:-4]
         rules.append(curr_rule)
         rules = [{"value": x, "tag": str(len(x))} for x in rules]
-        if len(rules) > 5:
+        if len(rules) > 25:
             self.logger.error(
-                "RULES ARE GREATER THAN 5! THIS IS NOT ALLOWED WITH ESSENTIAL ACCESS!"
+                "RULES ARE GREATER THAN 25! THIS IS NOT ALLOWED WITH ELEVATED ACCESS!"
             )
         return rules
 

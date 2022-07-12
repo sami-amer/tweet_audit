@@ -12,15 +12,19 @@ import atexit
 import os
 
 # lib
-from classes import POSTGRES_ARGS, SQLLITE_ARGS, MAC_ARGS
+from classes import POSTGRES_ARGS 
 from classes.classesv2 import TweetStream
+from tools.tools_postgre import Toolkit
 
 
 if __name__ == "__main__":
     # ! ADD MORE ERROR CATCHES!
-    bearer_token = os.environ.get("BEARER_TOKEN")
+    bearer_token = os.environ.get("BEARER_AUTH")
     # stream = TweetStream(bearer_token, "test.db")
     # postgres_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
 
-    stream = TweetStream(bearer_token, MAC_ARGS)
-    stream.run()
+    # stream = TweetStream(bearer_token, POSTGRES_ARGS)
+    # stream.run()
+
+    kit = Toolkit(bearer_token, POSTGRES_ARGS)
+    kit.handler.get_rules() 
