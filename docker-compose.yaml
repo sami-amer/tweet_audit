@@ -24,20 +24,6 @@ services:
       - validator
     entrypoint: settings-tp -vv -C tcp://validator:4004
 
-  # intkey-tp-rust:
-  #   image: hyperledger/sawtooth-intkey-tp-rust:chime
-  #   container_name: sawtooth-intkey-tp-rust-default
-  #   depends_on:
-  #     - validator
-  #   entrypoint: intkey-tp-rust -vv -C tcp://validator:4004
-
-  # xo-tp-rust:
-  #   image: hyperledger/sawtooth-xo-tp-rust:chime
-  #   container_name: sawtooth-xo-tp-rust-default
-  #   depends_on:
-  #     - validator
-  #   entrypoint: xo-tp-rust -vv -C tcp://validator:4004
-
   twit-tp-rust:
     image: twit-tp:latest
     container_name: twit-tp-default

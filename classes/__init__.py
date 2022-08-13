@@ -14,10 +14,7 @@ __status__ = "Development"
 toml_dict = toml.load("classes/.server.toml")
 
 POSTGRES_ARGS = toml_dict["postgres"]
-SQLLITE_ARGS = toml_dict["sqllite"]
-MAC_ARGS = toml_dict["postgres-mac"]
-AWS_ARGS = toml_dict["AWS"]
 
 os.environ['POSTGRES_HOST'] = POSTGRES_ARGS["host"]
 os.environ['POSTGRES_DBNAME'] = POSTGRES_ARGS["dbname"]
-# Update env getting here
+# ! Update env getting here

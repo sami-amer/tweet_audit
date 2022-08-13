@@ -8,7 +8,7 @@ import psycopg.sql as psql
 
 # lib
 from classes.classesv2 import TwitterHandler
-from classes import POSTGRES_ARGS, SQLLITE_ARGS, MAC_ARGS, AWS_ARGS
+from classes import POSTGRES_ARGS 
 
 
 class Toolkit:
@@ -163,7 +163,7 @@ class Toolkit:
         flattened_responses = [
             (item["id"], item["username"], item["name"])
             for response in responses
-            for item in response["data"]
+            for item in response["data"] # ! problem here
         ]
 
         conn = self.connection
@@ -193,7 +193,7 @@ class Toolkit:
         conn.commit()
 
     def update_user_group_db(self, users: list[str], table_name:str ):
-
+        # ! make this resilient to duplicates
         conn = self.connection
         cur = conn.cursor()
         names = cur.execute(
@@ -208,7 +208,7 @@ class Toolkit:
             users_add,
         )
 
-    def get_user_list(self, table_name: str):
+    def get_user_list(self, table_name: str) -> list:
 
         conn = self.connection
         cur = conn.cursor()
@@ -216,9 +216,7 @@ class Toolkit:
             psql.SQL("SELECT user_name FROM {};").format(psql.Identifier(table_name))
         )
         output = cur.fetchall()
-        return (
-            output  #! Do I want this to output solo tuples? Fix tests if not the case
-        )
+        return [user[0] for user in output]
 
     def get_user_id(self, user: str) -> dict:
         """
@@ -227,26 +225,12 @@ class Toolkit:
         Arguments:
             user    (str): the twitter username without '@'
         """
-        # Specify the usernames that you want to lookup below
-        # You can enter up to 100 comma-separated values.
         usernames = f"usernames={user}"
         user_fields = "user.fields=id,verified,description,created_at"
-        # User fields are adjustable, options include:
-        # created_at, description, entities, id, location, name,
-        # pinned_tweet_id, profile_image_url, protected,
-        # public_metrics, url, username, verified, and withheld
+
         url = "https://api.twitter.com/2/users/by?{}&{}".format(usernames, user_fields)
         data = self.handler.get_from_endpoint(url)
-        # data = self.handler.get_from_endpoint(url)["data"][0]
-        # print(data)
-        # info = {
-        #     "id": data["id"],
-        #     "name": data["name"],
-        #     "username": data["username"],
-        #     "description": data["description"],
-        #     "verified": data["verified"],
-        #     "creation_date": data["created_at"],
-        # }
+
         return data
 
     def get_user_timeline(self, user_id: str, max_results=5) -> list[dict]:
@@ -275,6 +259,30 @@ class Toolkit:
             }
             tweets.append(info)
         return tweets
+
+    def download_user_mapping(self):
+        user_mapping = {}
+        with self.connection as conn:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    psql.SQL("SELECT user_id,user_name FROM {};").format(
+                        psql.Identifier("id_name_mapping")
+                    )
+                )
+            except Exception as err:
+                self.logger.error(f"ERROR DOWNLOADING USER MAPPING {err}")
+            try:
+                user_data = cur.fetchall()
+            except:
+                user_data = None
+            if user_data == None:
+                self.logger.warning("id_name_mapping Empty. Is this expected?")
+                return
+            for data in user_data:
+                user_mapping[data[0]] = data[1]
+        self.logger.info("User Mapping Downloaded Successfully!")
+        return user_mapping
 
     def get_user_from_tweet(self, id: str):
         tweet_fields = "tweet.fields=lang,author_id"
@@ -345,23 +353,33 @@ class Toolkit:
         return cur.fetchone()[0]
 
     def add_users(self, users: list[str],table_name: str) -> None:
-        # ! Add logging here
-        if self.table_exists(table_name):
+        self.logger.info(f"Adding {len(users)} users to {table_name}")
+        if not self.table_exists(table_name):
             self.create_user_group_db(users, table_name)
         else:
             self.update_user_group_db(users, table_name)
         
         self.update_author_to_id()
         self.update_user_rules(users)
-        # ! probably add some sort of syncing here
+        self.sync_users(table_name)
 
     
-    def sync_users(self):
-        pass
+    def sync_users(self, table_name):
+
         # ? grab users from local sql
+        table_local_users = set(self.get_user_list(table_name))
         # ? grab users from stream
+        old_rules, response = self.handler.get_rules()
+        stream_users = set(self.extract_users_from_rules(old_rules)) if old_rules else set() 
         # ? Compare and find most efficient way to update (need a func and algo just for this)
-        # ? delete necessary rules, add new rules
+        to_add = table_local_users - stream_users
+        global_local_users = set(self.download_user_mapping().values())
+        to_delete = stream_users - global_local_users 
+
+        if to_add:
+            self.add_users(to_add, table_name)
+        if to_delete:
+            self.remove_users_from_rules(to_delete)
 
 if __name__ == "__main__":
     # --- Code to load pickle and usernames from df
@@ -373,11 +391,11 @@ if __name__ == "__main__":
     # df = pd.read_csv("_data/senate_usernames_dec21.csv")
     # senators = df["username"].to_list()
 
-    # american_news = ["AP", "WhiteHouse", "FoxNews", "CNN", "potus", "msnbc"]
+    american_news = ["AP", "WhiteHouse", "FoxNews", "CNN", "potus", "msnbc"]
 
     bearer_token = os.environ.get("BEARER_TOKEN")
     # db_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
-    db_args = AWS_ARGS
+    db_args = POSTGRES_ARGS 
 
     # kit = Toolkit(bearer_token, "test.db")
     kit = Toolkit(bearer_token, db_args)
@@ -385,8 +403,11 @@ if __name__ == "__main__":
 
     # kit.initialize_db()
     # kit.update_author_to_id()
-    kit.test_connection()
+    # kit.test_connection()
     # print(kit.handler.get_rules())
+
+    kit.add_users(american_news,"american_news")
+    kit.sync_users("id_name_mapping")
 
     # ! Create a functino that syncs local and stream users
     # kit.remove_users_from_rules(["senatemajldr"])

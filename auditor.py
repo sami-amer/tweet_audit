@@ -19,7 +19,7 @@ from tools.tools_postgre import Toolkit
 
 if __name__ == "__main__":
     # ! ADD MORE ERROR CATCHES!
-    bearer_token = os.environ.get("BEARER_AUTH")
+    bearer_token = os.environ.get("BEARER_TOKEN")
     # stream = TweetStream(bearer_token, "test.db")
     # postgres_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
 

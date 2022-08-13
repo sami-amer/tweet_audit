@@ -20,7 +20,7 @@ import psycopg
 import psycopg.sql as psql
 
 # lib
-from . import MAC_ARGS, POSTGRES_ARGS, SQLLITE_ARGS
+from . import  POSTGRES_ARGS
 
 
 class TwitterHandler:
@@ -83,7 +83,7 @@ class TwitterHandler:
             data = response["data"]
             meta = response["meta"]
             info = {"rules": data, "rule_count": meta["result_count"]}
-            self.logger.info(info)
+            self.logger.debug(info)
             return info, response
         except KeyError:
             self.logger.warning("No Rules Found!")
