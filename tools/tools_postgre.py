@@ -192,7 +192,7 @@ class Toolkit:
         )
         conn.commit()
 
-    def update_user_group_db(self, users, table_name):
+    def update_user_group_db(self, users: list[str], table_name:str ):
 
         conn = self.connection
         cur = conn.cursor()
@@ -208,7 +208,7 @@ class Toolkit:
             users_add,
         )
 
-    def get_user_list(self, table_name):
+    def get_user_list(self, table_name: str):
 
         conn = self.connection
         cur = conn.cursor()
@@ -338,6 +338,30 @@ class Toolkit:
         )
         conn.commit()
 
+    def table_exists(self,table_name: str):
+        conn = self.connection
+        cur = conn.cursor()
+        cur.execute("select exists(select * from information_schema.tables where table_name=%s)", (table_name,))
+        return cur.fetchone()[0]
+
+    def add_users(self, users: list[str],table_name: str) -> None:
+        # ! Add logging here
+        if self.table_exists(table_name):
+            self.create_user_group_db(users, table_name)
+        else:
+            self.update_user_group_db(users, table_name)
+        
+        self.update_author_to_id()
+        self.update_user_rules(users)
+        # ! probably add some sort of syncing here
+
+    
+    def sync_users(self):
+        pass
+        # ? grab users from local sql
+        # ? grab users from stream
+        # ? Compare and find most efficient way to update (need a func and algo just for this)
+        # ? delete necessary rules, add new rules
 
 if __name__ == "__main__":
     # --- Code to load pickle and usernames from df
@@ -362,17 +386,9 @@ if __name__ == "__main__":
     # kit.initialize_db()
     # kit.update_author_to_id()
     kit.test_connection()
-    # kit.create_user_group_db(senators,"us_senators")
-
-    # kit.update_user_rules(american_news)
-    # kit.update_user_group_db(american_news,"american_news")
-    # kit.update_author_to_id()
-    #! WRAP THESE INTO ONE FUNC ^
-    #! ADD UPDATE OR DELETE FUNCTION FOR DB
-    #! IMPLEMENT NEW CHANGES FOR SQLLITE
-
     # print(kit.handler.get_rules())
 
+    # ! Create a functino that syncs local and stream users
     # kit.remove_users_from_rules(["senatemajldr"])
     # ! ADD CONNECTION CLOSES OR TRY EXCEPT FINALYS FOR CONNECTIONS
     # kit.update_author_to_id()
