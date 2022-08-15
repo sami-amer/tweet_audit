@@ -64,12 +64,12 @@ class TwitterHandler:
 
     def post_to_endpoint(self, url: str, payload: dict) -> dict:
         response = requests.post(url, auth=self.bearer_oauth, json=payload)
-        if response.status_code != 200 or response.status_code != 201:
-            raise Exception(
-                "Cannot delete rules (HTTP {}): {}".format(
-                    response.status_code, response.text
-                )
-            )
+        # if response.status_code != 200 or response.status_code != 201:
+        #     raise Exception(
+        #         "Cannot delete rules (HTTP {}): {}".format(
+        #             response.status_code, response.text
+        #         )
+        #     )
         return response
 
     def get_rules(self):
@@ -126,10 +126,8 @@ class TwitterHandler:
         """
         payload = {"add": rules}
         url = "https://api.twitter.com/2/tweets/search/stream/rules"
-
-        response = self.post_to_endpoint(url, payload)
+        response = self.post_to_endpoint(url, payload).json()
         self.logger.debug(f"Rule Addition Respone: {json.dumps(response)}")
-
         try:
             if response["errors"]:
                 self.logger.warning(
@@ -138,7 +136,8 @@ class TwitterHandler:
                 for num, error in enumerate(response["errors"]):
                     self.logger.warning(f"Error_{num} Title: {error['title']}")
                     self.logger.warning(f"Error_{num} Value: {error['value']}")
-                    self.logger.warning(f"Error_{num} id: {error['id']}")
+                    self.logger.warning(f"Error_{num} details: {error['details']}") # ! might not always exist
+
 
                 return None
         except KeyError:

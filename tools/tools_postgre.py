@@ -98,8 +98,7 @@ class Toolkit:
         self.handler.set_rules(rules)
         return rules  # only for testing purposes
 
-    def update_user_rules(self, new_users: list):
-        #! add automatic id - username mapping update
+    def update_user_rules(self, new_users: list) -> list[dict[str]]:
         old_rules, response = self.handler.get_rules()
 
         users = self.extract_users_from_rules(old_rules) if old_rules else []
@@ -109,7 +108,9 @@ class Toolkit:
         rules = self.format_rules(users)
 
         self.handler.delete_all_rules(response)
-        self.handler.set_rules(rules)
+        self.logger.debug(f"{self.handler.set_rules(rules)}")
+        self.update_author_to_id()
+
         return rules  # only for testing purposes
 
     def set_user_rules(self, users):
@@ -119,10 +120,19 @@ class Toolkit:
 
         self.handler.delete_all_rules(response)
         self.handler.set_rules(rules)
+        self.update_author_to_id()
 
-    def update_author_to_id(self):
-
-        rules = [x["value"].split("OR") for x in self.handler.get_rules()[0]["rules"]]
+    def update_author_to_id(self) -> None:
+        """
+        Gets users from the Twitter Stream, compares them to local id_name_mapping, and updates anything missing
+        """
+        info, resp = self.handler.get_rules()
+        
+        if not info:  
+            return
+        # print(resp)
+        # print(info)
+        rules = [x["value"].split("OR") for x in info["rules"]]
         # --- from https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-a-list-of-lists
         flattened_rules = [item for rule in rules for item in rule]
         # ----
@@ -135,21 +145,23 @@ class Toolkit:
         conn = self.connection
         cur = conn.cursor()
         current_names = cur.execute(
-            psql.SQL("SELECT user_name FROM {};").format(
+            psql.SQL("SELECT user_name,user_id FROM {};").format(
                 psql.Identifier("id_name_mapping")
             )
         )
         current_names = cur.fetchall()
-        current_names = [name[0] for name in current_names] if current_names else None
+        current_ids = set([name[1] for name in current_names]) if current_names else set() 
+        current_names = [name[0] for name in current_names] if current_names else set() 
 
         self.logger.info("Got names from DB")
         names_set = set(current_names) if current_names else set()
         users_add = [name for name in users if name not in names_set]
+
         if not users_add:
             self.logger.info("No new users to add to mapping, skipping...")
             return
+
         for i in range(0, len(users_add), 100):
-            # get_rule = users_add[i:i+1].join(",")
 
             get_rule = ",".join(users_add[i : i + 100])
             get_rules.append(get_rule)
@@ -163,8 +175,15 @@ class Toolkit:
         flattened_responses = [
             (item["id"], item["username"], item["name"])
             for response in responses
-            for item in response["data"] # ! problem here
+            for item in response["data"] 
         ]
+        to_update = [] 
+        to_add =  []
+        for resp in flattened_responses:
+            if int(resp[0]) in current_ids:
+                to_update.append(resp)
+            else:
+                to_add.append(resp)
 
         conn = self.connection
         curr = conn.cursor()
@@ -172,11 +191,18 @@ class Toolkit:
             psql.SQL("INSERT INTO {} VALUES (%s,%s,%s)").format(
                 psql.Identifier("id_name_mapping")
             ),
-            flattened_responses,
+            to_add,
         )
         conn.commit()
+        for resp in to_update:
+            resp = {"user_id":resp[0], "user_name":resp[1], "user_full_name":resp[2]}
+            curr.execute(psql.SQL("UPDATE {} SET user_name=%(user_name)s, user_full_name=%(user_full_name)s WHERE user_id=%(user_id)s;").format(psql.Identifier("id_name_mapping")), resp)
+            conn.commit()
 
     def create_user_group_db(self, users: list[str], table_name: str) -> None:
+        """
+        creates a table with table_name and a simple list of users
+        """
         users_add = [[user] for user in users]
         conn = self.connection
         cur = conn.cursor()
@@ -192,15 +218,17 @@ class Toolkit:
         )
         conn.commit()
 
-    def update_user_group_db(self, users: list[str], table_name:str ):
-        # ! make this resilient to duplicates
+    def update_user_group_db(self, users: list[str], table_name:str) -> None:
+        """
+        Gets names from a user_db, compares them to the input users, and then adds the difference
+        """
         conn = self.connection
         cur = conn.cursor()
         names = cur.execute(
             psql.SQL("SELECT user_name FROM {};").format(psql.Identifier(table_name))
         )
         names = cur.fetchall()
-        names_set = set(names)
+        names_set = {name[0] for name in names}
         users_add = [[name] for name in users if name not in names_set]
 
         cur.executemany(
@@ -262,25 +290,26 @@ class Toolkit:
 
     def download_user_mapping(self):
         user_mapping = {}
-        with self.connection as conn:
-            cur = conn.cursor()
-            try:
-                cur.execute(
-                    psql.SQL("SELECT user_id,user_name FROM {};").format(
-                        psql.Identifier("id_name_mapping")
-                    )
+
+        conn = self.connection
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                psql.SQL("SELECT user_id,user_name FROM {};").format(
+                    psql.Identifier("id_name_mapping")
                 )
-            except Exception as err:
-                self.logger.error(f"ERROR DOWNLOADING USER MAPPING {err}")
-            try:
-                user_data = cur.fetchall()
-            except:
-                user_data = None
-            if user_data == None:
-                self.logger.warning("id_name_mapping Empty. Is this expected?")
-                return
-            for data in user_data:
-                user_mapping[data[0]] = data[1]
+            )
+        except Exception as err:
+            self.logger.error(f"ERROR DOWNLOADING USER MAPPING {err}")
+        try:
+            user_data = cur.fetchall()
+        except:
+            user_data = None
+        if user_data == None:
+            self.logger.warning("id_name_mapping Empty. Is this expected?")
+            return
+        for data in user_data:
+            user_mapping[data[0]] = data[1]
         self.logger.info("User Mapping Downloaded Successfully!")
         return user_mapping
 
@@ -299,10 +328,15 @@ class Toolkit:
         self.logger.info(f"User ID Query Returned: {user_id}")
         return user_id
 
-    def initialize_db(self):
+    def initialize_db(self) -> None:
+        """
+        Creates the tweet table and the id_name_mapping table.
+        Also adds a test into the tweet table to make sure all is well.
+        """
         # with self.connection as conn:
         conn = self.connection
         cur = conn.cursor()
+
         try:
             cur.execute(
                 psql.SQL(
@@ -312,8 +346,17 @@ class Toolkit:
                 user_full_name TEXT);"""
                 ).format(psql.Identifier("id_name_mapping"))
             )
+            conn.commit()
+
         except psycopg.errors.DuplicateTable:
             self.logger.warning("DUPLICATE TABLE, id_name_mapping EXISTS")
+            conn.rollback()
+
+        except psycopg.errors.InFailedSqlTransaction as e:
+            self.logger.error(f"Fatal Error: {e}")
+            conn.rollback()
+            raise psycopg.errors.InFailedSqlTransaction
+
         try:
             cur.execute(
                 psql.SQL(
@@ -324,19 +367,36 @@ class Toolkit:
                 tweet_text TEXT NOT NULL);"""
                 ).format(psql.Identifier("tweets"))
             )
+            conn.commit()
+
         except psycopg.errors.DuplicateTable:
             self.logger.warning("DUPLICATE TABLE, tweets EXISTS")
+            conn.rollback() 
+
+        except psycopg.errors.InFailedSqlTransaction as e:
+            self.logger.error(f"Fatal Error: {e}")
+            conn.rollback()
+            raise psycopg.errors.InFailedSqlTransaction
+
+        try:
+            cur.execute(
+                psql.SQL("INSERT INTO {} VALUES (%s,%s,%s,%s);").format(
+                    psql.Identifier("tweets")
+                ),
+                (1, 1, "testName", "testText"),
+            )
+            conn.commit()
+        except psycopg.errors.UniqueViolation:
+            self.logger.warning("test tweet is already in database! Are you re-initializing?")
+            conn.rollback()
+
         conn.commit()
 
-        cur.execute(
-            psql.SQL("INSERT INTO {} VALUES (%s,%s,%s,%s);").format(
-                psql.Identifier("tweets")
-            ),
-            (1, 1, "testName", "testText"),
-        )
-        conn.commit()
-
-    def test_connection(self):
+    def test_connection(self) -> None:
+        """
+        Tests connection to the postgresql server by looking for a tweet with id=1
+        This tweet is added during initialize_db()
+        """
         conn = self.connection
         cur = conn.cursor()
         cur.execute(
@@ -353,6 +413,9 @@ class Toolkit:
         return cur.fetchone()[0]
 
     def add_users(self, users: list[str],table_name: str) -> None:
+        """
+        If a table with table_name exists, updates the table. Otherwsie creates the table and updates.
+        """
         self.logger.info(f"Adding {len(users)} users to {table_name}")
         if not self.table_exists(table_name):
             self.create_user_group_db(users, table_name)
@@ -364,14 +427,18 @@ class Toolkit:
         self.sync_users(table_name)
 
     
-    def sync_users(self, table_name):
+    def sync_users(self, table_name) -> None:
+        """
+        Compares local table and remote stream, and updates the users.
+        Is run on a per-table basis
+        """
 
-        # ? grab users from local sql
+        #  grab users from local sql
         table_local_users = set(self.get_user_list(table_name))
-        # ? grab users from stream
+        #  grab users from stream
         old_rules, response = self.handler.get_rules()
         stream_users = set(self.extract_users_from_rules(old_rules)) if old_rules else set() 
-        # ? Compare and find most efficient way to update (need a func and algo just for this)
+        #  Compare and find most efficient way to update (need a func and algo just for this)
         to_add = table_local_users - stream_users
         global_local_users = set(self.download_user_mapping().values())
         to_delete = stream_users - global_local_users 
@@ -381,40 +448,37 @@ class Toolkit:
         if to_delete:
             self.remove_users_from_rules(to_delete)
 
+    def cache_users_local(self,cache_path):
+        users = [str(user) for user in self.download_user_mapping().values()]
+        with open(cache_path,"w+") as f:
+            for user in users:
+                f.write(user+'\n')
+    
+    def read_from_cache(self,cache_path):
+        users = []
+        with open(cache_path,"r") as f:
+            for line in f:
+                users.append(line.strip())
+
+        return users
+
 if __name__ == "__main__":
-    # --- Code to load pickle and usernames from df
-    # with open("_data/pickles/rule_dict","r") as f:
-    # rules = pickle.load(f)
-    # json.dump(rules,f)
-    # rules = json.load(f)
 
-    # df = pd.read_csv("_data/senate_usernames_dec21.csv")
-    # senators = df["username"].to_list()
-
-    american_news = ["AP", "WhiteHouse", "FoxNews", "CNN", "potus", "msnbc"]
 
     bearer_token = os.environ.get("BEARER_TOKEN")
-    # db_args = {"host": "localhost", "dbname": "template1", "user": "postgres"}
     db_args = POSTGRES_ARGS 
 
-    # kit = Toolkit(bearer_token, "test.db")
+
     kit = Toolkit(bearer_token, db_args)
-    # print(kit.connection)
+    news = kit.read_from_cache("news.bak")
+    senators = kit.read_from_cache("senators.bak")
+    house = kit.read_from_cache("house.bak")
 
-    # kit.initialize_db()
-    # kit.update_author_to_id()
-    # kit.test_connection()
+    kit.initialize_db()
+    kit.test_connection()
+    kit.add_users(news,"news_orgs")
+    kit.add_users(senators,"us_senate")
+    kit.add_users(house,"us_house")
+    kit.cache_users_local("local_user.txt")
+
     # print(kit.handler.get_rules())
-
-    kit.add_users(american_news,"american_news")
-    kit.sync_users("id_name_mapping")
-
-    # ! Create a functino that syncs local and stream users
-    # kit.remove_users_from_rules(["senatemajldr"])
-    # ! ADD CONNECTION CLOSES OR TRY EXCEPT FINALYS FOR CONNECTIONS
-    # kit.update_author_to_id()
-    # kit.update_user_rules
-    # for user in usernames:
-    #     print(kit.get_user_id(user))
-    # kit.add_user_group_db(usernames, "NEWS_USER_NAMES")
-    # kit.update_user_group_db(usernames, "NEWS_USER_NAMES")
