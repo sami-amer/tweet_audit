@@ -12,7 +12,7 @@ import atexit
 import os
 
 # lib
-from classes import POSTGRES_ARGS 
+from classes import POSTGRES_ARGS
 from classes.classesv2 import TweetStream
 from tools.tools_postgre import Toolkit
 
@@ -27,4 +27,4 @@ if __name__ == "__main__":
     # stream.run()
 
     kit = Toolkit(bearer_token, POSTGRES_ARGS)
-    kit.handler.get_rules() 
+    kit.handler.get_rules()

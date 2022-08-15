@@ -20,7 +20,7 @@ import psycopg
 import psycopg.sql as psql
 
 # lib
-from . import  POSTGRES_ARGS
+from . import POSTGRES_ARGS
 
 
 class TwitterHandler:
@@ -136,8 +136,9 @@ class TwitterHandler:
                 for num, error in enumerate(response["errors"]):
                     self.logger.warning(f"Error_{num} Title: {error['title']}")
                     self.logger.warning(f"Error_{num} Value: {error['value']}")
-                    self.logger.warning(f"Error_{num} details: {error['details']}") # ! might not always exist
-
+                    self.logger.warning(
+                        f"Error_{num} details: {error['details']}"
+                    )  # ! might not always exist
 
                 return None
         except KeyError:

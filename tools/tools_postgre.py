@@ -8,13 +8,13 @@ import psycopg.sql as psql
 
 # lib
 from classes.classesv2 import TwitterHandler
-from classes import POSTGRES_ARGS 
+from classes import POSTGRES_ARGS
 
 
 class Toolkit:
     def __init__(self, bearer_token, db_args):
         self.logger = self.create_loggers()
-        self.handler = TwitterHandler(bearer_token, None,self.logger)
+        self.handler = TwitterHandler(bearer_token, None, self.logger)
         self.db_args = db_args
 
         try:
@@ -127,8 +127,8 @@ class Toolkit:
         Gets users from the Twitter Stream, compares them to local id_name_mapping, and updates anything missing
         """
         info, resp = self.handler.get_rules()
-        
-        if not info:  
+
+        if not info:
             return
         # print(resp)
         # print(info)
@@ -150,8 +150,10 @@ class Toolkit:
             )
         )
         current_names = cur.fetchall()
-        current_ids = set([name[1] for name in current_names]) if current_names else set() 
-        current_names = [name[0] for name in current_names] if current_names else set() 
+        current_ids = (
+            set([name[1] for name in current_names]) if current_names else set()
+        )
+        current_names = [name[0] for name in current_names] if current_names else set()
 
         self.logger.info("Got names from DB")
         names_set = set(current_names) if current_names else set()
@@ -175,10 +177,10 @@ class Toolkit:
         flattened_responses = [
             (item["id"], item["username"], item["name"])
             for response in responses
-            for item in response["data"] 
+            for item in response["data"]
         ]
-        to_update = [] 
-        to_add =  []
+        to_update = []
+        to_add = []
         for resp in flattened_responses:
             if int(resp[0]) in current_ids:
                 to_update.append(resp)
@@ -195,8 +197,13 @@ class Toolkit:
         )
         conn.commit()
         for resp in to_update:
-            resp = {"user_id":resp[0], "user_name":resp[1], "user_full_name":resp[2]}
-            curr.execute(psql.SQL("UPDATE {} SET user_name=%(user_name)s, user_full_name=%(user_full_name)s WHERE user_id=%(user_id)s;").format(psql.Identifier("id_name_mapping")), resp)
+            resp = {"user_id": resp[0], "user_name": resp[1], "user_full_name": resp[2]}
+            curr.execute(
+                psql.SQL(
+                    "UPDATE {} SET user_name=%(user_name)s, user_full_name=%(user_full_name)s WHERE user_id=%(user_id)s;"
+                ).format(psql.Identifier("id_name_mapping")),
+                resp,
+            )
             conn.commit()
 
     def create_user_group_db(self, users: list[str], table_name: str) -> None:
@@ -218,7 +225,7 @@ class Toolkit:
         )
         conn.commit()
 
-    def update_user_group_db(self, users: list[str], table_name:str) -> None:
+    def update_user_group_db(self, users: list[str], table_name: str) -> None:
         """
         Gets names from a user_db, compares them to the input users, and then adds the difference
         """
@@ -371,7 +378,7 @@ class Toolkit:
 
         except psycopg.errors.DuplicateTable:
             self.logger.warning("DUPLICATE TABLE, tweets EXISTS")
-            conn.rollback() 
+            conn.rollback()
 
         except psycopg.errors.InFailedSqlTransaction as e:
             self.logger.error(f"Fatal Error: {e}")
@@ -387,7 +394,9 @@ class Toolkit:
             )
             conn.commit()
         except psycopg.errors.UniqueViolation:
-            self.logger.warning("test tweet is already in database! Are you re-initializing?")
+            self.logger.warning(
+                "test tweet is already in database! Are you re-initializing?"
+            )
             conn.rollback()
 
         conn.commit()
@@ -406,13 +415,16 @@ class Toolkit:
         )
         conn.commit()
 
-    def table_exists(self,table_name: str):
+    def table_exists(self, table_name: str):
         conn = self.connection
         cur = conn.cursor()
-        cur.execute("select exists(select * from information_schema.tables where table_name=%s)", (table_name,))
+        cur.execute(
+            "select exists(select * from information_schema.tables where table_name=%s)",
+            (table_name,),
+        )
         return cur.fetchone()[0]
 
-    def add_users(self, users: list[str],table_name: str) -> None:
+    def add_users(self, users: list[str], table_name: str) -> None:
         """
         If a table with table_name exists, updates the table. Otherwsie creates the table and updates.
         """
@@ -421,12 +433,11 @@ class Toolkit:
             self.create_user_group_db(users, table_name)
         else:
             self.update_user_group_db(users, table_name)
-        
+
         self.update_author_to_id()
         self.update_user_rules(users)
         self.sync_users(table_name)
 
-    
     def sync_users(self, table_name) -> None:
         """
         Compares local table and remote stream, and updates the users.
@@ -437,37 +448,38 @@ class Toolkit:
         table_local_users = set(self.get_user_list(table_name))
         #  grab users from stream
         old_rules, response = self.handler.get_rules()
-        stream_users = set(self.extract_users_from_rules(old_rules)) if old_rules else set() 
+        stream_users = (
+            set(self.extract_users_from_rules(old_rules)) if old_rules else set()
+        )
         #  Compare and find most efficient way to update (need a func and algo just for this)
         to_add = table_local_users - stream_users
         global_local_users = set(self.download_user_mapping().values())
-        to_delete = stream_users - global_local_users 
+        to_delete = stream_users - global_local_users
 
         if to_add:
             self.add_users(to_add, table_name)
         if to_delete:
             self.remove_users_from_rules(to_delete)
 
-    def cache_users_local(self,cache_path):
+    def cache_users_local(self, cache_path):
         users = [str(user) for user in self.download_user_mapping().values()]
-        with open(cache_path,"w+") as f:
+        with open(cache_path, "w+") as f:
             for user in users:
-                f.write(user+'\n')
-    
-    def read_from_cache(self,cache_path):
+                f.write(user + "\n")
+
+    def read_from_cache(self, cache_path):
         users = []
-        with open(cache_path,"r") as f:
+        with open(cache_path, "r") as f:
             for line in f:
                 users.append(line.strip())
 
         return users
 
+
 if __name__ == "__main__":
 
-
     bearer_token = os.environ.get("BEARER_TOKEN")
-    db_args = POSTGRES_ARGS 
-
+    db_args = POSTGRES_ARGS
 
     kit = Toolkit(bearer_token, db_args)
     news = kit.read_from_cache("news.bak")
@@ -476,9 +488,9 @@ if __name__ == "__main__":
 
     kit.initialize_db()
     kit.test_connection()
-    kit.add_users(news,"news_orgs")
-    kit.add_users(senators,"us_senate")
-    kit.add_users(house,"us_house")
+    kit.add_users(news, "news_orgs")
+    kit.add_users(senators, "us_senate")
+    kit.add_users(house, "us_house")
     kit.cache_users_local("local_user.txt")
 
     # print(kit.handler.get_rules())

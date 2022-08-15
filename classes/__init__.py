@@ -15,6 +15,6 @@ toml_dict = toml.load("classes/.server.toml")
 
 POSTGRES_ARGS = toml_dict["postgres"]
 
-os.environ['POSTGRES_HOST'] = POSTGRES_ARGS["host"]
-os.environ['POSTGRES_DBNAME'] = POSTGRES_ARGS["dbname"]
+os.environ["POSTGRES_HOST"] = POSTGRES_ARGS["host"]
+os.environ["POSTGRES_DBNAME"] = POSTGRES_ARGS["dbname"]
 # ! Update env getting here
