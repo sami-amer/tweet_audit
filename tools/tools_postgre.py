@@ -8,7 +8,7 @@ import psycopg.sql as psql
 
 # lib
 from classes.classesv2 import TwitterHandler
-from classes import PG_ARGS 
+from classes import PG_ARGS
 
 
 class Toolkit:
@@ -410,7 +410,13 @@ class Toolkit:
         """
         self.logger.info("Checking environment variables")
 
-        env_vars = ["POSTGRES_HOST", "POSTGRES_DBNAME", "POSTGRES_USER", "POSTGRES_PASS", "BEARER_TOKEN"]
+        env_vars = [
+            "POSTGRES_HOST",
+            "POSTGRES_DBNAME",
+            "POSTGRES_USER",
+            "POSTGRES_PASS",
+            "BEARER_TOKEN",
+        ]
         self.logger.info(os.environ)
         for env_var in env_vars:
             self.logger.info(f"Looking for {env_var}...")
@@ -418,10 +424,12 @@ class Toolkit:
             if os.environ.get(env_var):
                 self.logger.info("FOUND!")
                 if not secret:
-                    self.logger.info(f"NON-SECRET MODE: value of {env_var} is {os.environ.get(env_var)}")
+                    self.logger.info(
+                        f"NON-SECRET MODE: value of {env_var} is {os.environ.get(env_var)}"
+                    )
             else:
                 self.logger.warning(f"Environment variable {env_var} was NOT FOUND!")
-        
+
         self.logger.info("Testing Connection to Postgres Server")
 
         conn = self.connection
@@ -500,7 +508,7 @@ class Toolkit:
 if __name__ == "__main__":
 
     bearer_token = os.environ.get("BEARER_TOKEN")
-    db_args = PG_ARGS 
+    db_args = PG_ARGS
 
     kit = Toolkit(bearer_token, db_args)
     # news = kit.read_from_cache("news.bak")
