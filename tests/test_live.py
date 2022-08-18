@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 # lib
-from classes.classesv1 import TwitterHandler
+from _deprecated.classesv1 import TwitterHandler
 
 
 formatter = logging.Formatter("%(asctime)s [%(name)s][%(levelname)s] %(message)s")

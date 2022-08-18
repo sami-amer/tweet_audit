@@ -17,7 +17,7 @@ async fn main() -> Result<(), tokio_postgres::Error> {
         "https://api.twitter.com/2/tweets/search/stream?expansions=author_id".to_string();
 
     log::info!("Starting Stream From URL: {:?}", &url);
-    let auth_token = match env::var("BEARER_AUTH") {
+    let auth_token = match env::var("BEARER_TOKEN") {
         Ok(auth_key) => auth_key,
         Err(_) => panic!("AUTH KEY NOT FOUND!"),
     };

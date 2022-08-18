@@ -20,7 +20,7 @@ import psycopg
 import psycopg.sql as psql
 
 # lib
-from . import POSTGRES_ARGS
+from . import PG_ARGS 
 
 
 class TwitterHandler:

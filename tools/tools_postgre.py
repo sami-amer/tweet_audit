@@ -8,7 +8,7 @@ import psycopg.sql as psql
 
 # lib
 from classes.classesv2 import TwitterHandler
-from classes import POSTGRES_ARGS
+from classes import PG_ARGS 
 
 
 class Toolkit:
@@ -25,6 +25,7 @@ class Toolkit:
             self.logger.error("POSTGRES CONNECTION BROKEN")
             self.logger.error(db_args)
             self.logger.error(f"{err}")
+            raise psycopg.errors.CannotConnectNow()
 
     @staticmethod
     def create_loggers() -> logging.Logger:
@@ -401,11 +402,28 @@ class Toolkit:
 
         conn.commit()
 
-    def test_connection(self) -> None:
+    def test_connection(self, secret=True) -> None:
         """
         Tests connection to the postgresql server by looking for a tweet with id=1
         This tweet is added during initialize_db()
+        Also prints out which envrionment variables are found; if secret=FALSE, prints the variables to the log
         """
+        self.logger.info("Checking environment variables")
+
+        env_vars = ["POSTGRES_HOST", "POSTGRES_DBNAME", "POSTGRES_USER", "POSTGRES_PASS", "BEARER_TOKEN"]
+        self.logger.info(os.environ)
+        for env_var in env_vars:
+            self.logger.info(f"Looking for {env_var}...")
+
+            if os.environ.get(env_var):
+                self.logger.info("FOUND!")
+                if not secret:
+                    self.logger.info(f"NON-SECRET MODE: value of {env_var} is {os.environ.get(env_var)}")
+            else:
+                self.logger.warning(f"Environment variable {env_var} was NOT FOUND!")
+        
+        self.logger.info("Testing Connection to Postgres Server")
+
         conn = self.connection
         cur = conn.cursor()
         cur.execute(
@@ -414,6 +432,9 @@ class Toolkit:
             )
         )
         conn.commit()
+
+        self.logger.info("Connection to Postgres server good!")
+        self.logger.info("Connection test complete.")
 
     def table_exists(self, table_name: str):
         conn = self.connection
@@ -479,18 +500,18 @@ class Toolkit:
 if __name__ == "__main__":
 
     bearer_token = os.environ.get("BEARER_TOKEN")
-    db_args = POSTGRES_ARGS
+    db_args = PG_ARGS 
 
     kit = Toolkit(bearer_token, db_args)
-    news = kit.read_from_cache("news.bak")
-    senators = kit.read_from_cache("senators.bak")
-    house = kit.read_from_cache("house.bak")
+    # news = kit.read_from_cache("news.bak")
+    # senators = kit.read_from_cache("senators.bak")
+    # house = kit.read_from_cache("house.bak")
 
-    kit.initialize_db()
+    # kit.initialize_db()
     kit.test_connection()
-    kit.add_users(news, "news_orgs")
-    kit.add_users(senators, "us_senate")
-    kit.add_users(house, "us_house")
-    kit.cache_users_local("local_user.txt")
+    # kit.add_users(news, "news_orgs")
+    # kit.add_users(senators, "us_senate")
+    # kit.add_users(house, "us_house")
+    # kit.cache_users_local("local_user.txt")
 
     # print(kit.handler.get_rules())

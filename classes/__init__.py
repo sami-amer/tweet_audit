@@ -13,8 +13,15 @@ __status__ = "Development"
 
 toml_dict = toml.load("classes/.server.toml")
 
-POSTGRES_ARGS = toml_dict["postgres"]
+PG_ARGS = toml_dict["postgres"]
+T_ARGS = toml_dict["twitter"]
 
-os.environ["POSTGRES_HOST"] = POSTGRES_ARGS["host"]
-os.environ["POSTGRES_DBNAME"] = POSTGRES_ARGS["dbname"]
-# ! Update env getting here
+os.environ["POSTGRES_HOST"] = PG_ARGS["host"]
+os.environ["POSTGRES_DBNAME"] = PG_ARGS["dbname"]
+os.environ["POSTGRES_USER"] = PG_ARGS["user"]
+
+if PG_ARGS["password"]:
+    os.environ["POSTGRES_PASS"] = PG_ARGS["password"] 
+
+if T_ARGS["auth"]:
+    os.environ["BEARER_TOKEN"] = T_ARGS["auth"] 

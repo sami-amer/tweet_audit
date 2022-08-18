@@ -1,0 +1,12 @@
+
+title = "Server Connection Info"
+
+[postgres]
+host = "localhost" # POTSGRES_HOST
+dbname = "tweet_audit" # POSTGRES_DBNAME
+user = "user" # POSTGRES_USER
+password = "admin" # POSTGRES_PASS
+port = "5432" #POSTGRES_PORT
+
+[twitter]
+auth = "test_auth" # BEARER_TOKEN

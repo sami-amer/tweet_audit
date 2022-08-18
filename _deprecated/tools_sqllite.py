@@ -7,7 +7,7 @@ import sqlite3
 import pandas as pd
 
 # lib
-from classes.classesv1 import TwitterHandler
+from _deprecated.classesv1 import TwitterHandler
 
 
 class Toolkit:
