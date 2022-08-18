@@ -114,8 +114,10 @@ class Toolkit:
 
         return rules  # only for testing purposes
 
-    def set_user_rules(self, users):
-        #! add automatic id - username mapping update
+    def set_user_rules(self, users) -> None:
+        """
+        using a new list of users, deletes the old rules and create a new set of rules
+        """
         old_rules, response = self.handler.get_rules()
         rules = self.format_rules(users)
 
@@ -466,6 +468,7 @@ class Toolkit:
         self.update_author_to_id()
         self.update_user_rules(users)
         self.sync_users(table_name)
+        self.clean_local_table(table_name)
 
     def sync_users(self, table_name) -> None:
         """
@@ -489,6 +492,26 @@ class Toolkit:
             self.add_users(to_add, table_name)
         if to_delete:
             self.remove_users_from_rules(to_delete)
+
+    def clean_local_table(self,table_name) -> None:
+        #  grab users from local sql
+        table_local_users = set(self.get_user_list(table_name))
+        #  grab users from stream
+        old_rules, response = self.handler.get_rules()
+        stream_users = (
+            set(self.extract_users_from_rules(old_rules)) if old_rules else set()
+        )
+        to_delete = table_local_users - stream_users
+        to_delete = [(x,) for x in to_delete]
+        conn = self.connection
+        cur = conn.cursor()
+        cur.executemany(
+            psql.SQL("DELETE FROM {} WHERE user_name=%s;").format(
+                psql.Identifier(table_name)
+            ),to_delete
+        )
+        conn.commit()
+        self.logger.info(f"Deleted following users from {table_name}: {to_delete}")
 
     def cache_users_local(self, cache_path):
         users = [str(user) for user in self.download_user_mapping().values()]
