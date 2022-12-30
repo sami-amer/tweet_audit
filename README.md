@@ -3,7 +3,7 @@ Using Distributed Ledgers to Hold Public Figures and Institutions Accountable
 
 ## What is this?
 
-At its core, this project aims to allow users to easily choose a list of public officials whose tweets they want to track, and automate the process of following and committing those tweets to a local database. Additionally, the project is built using a local blockchain implementation ([hyperledger sawtooth](https://www.hyperledger.org/use/sawtooth)), as a proof of concept for using this auditor as a larger database of public official tweets. For more about the philosphy behind this project, as well as the process from start to end, feel free to check out my blog post [here](https://blog.sami.ps/twitter-auditor#heading-immutable). The below "how-to" is excerpted from this post!
+At its core, this project aims to allow users to easily choose a list of public officials whose tweets they want to track, and automate the process of following and committing those tweets to a local database. Additionally, the project is built using a local blockchain implementation ([hyperledger sawtooth](https://www.hyperledger.org/use/sawtooth)), as a proof of concept for using this auditor as a larger database of public official tweets. For more about the philosphy behind this project, as well as the process from start to end, feel free to check out my blog post [here](https://blog.sami.ps/twitter-auditor). The below "how-to" is excerpted from this post!
 
 ## How To
 
